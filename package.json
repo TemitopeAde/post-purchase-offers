@@ -17,14 +17,25 @@
   "dependencies": {
     "@wix/astro": "^2.75.3",
     "@wix/dashboard": "^1.3.43",
+    "@wix/data": "^1.0.539",
     "@wix/design-system": "^1.154.0",
+    "@wix/ecom": "^1.0.2622",
+    "@wix/editor": "^1.998.0",
     "@wix/essentials": "^0.1.23",
+    "@wix/site-window": "^1.59.0",
+    "@wix/stores": "^1.0.970",
+    "@wix/wix-ui-icons-common": "^3.193.0",
     "astro": "^5.8.0",
-    "typescript": "^5.8.3"
+    "lucide-react": "^1.65.0",
+    "react-to-webcomponent": "^2.0.0",
+    "sonner": "^2.0.8",
+    "typescript": "^5.8.3",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
     "@astrojs/react": "^4.3.0",
+    "@types/node": "^26.6.6",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
     "@wix/astro-wix-hosting-adapter": "^2.0.0",
