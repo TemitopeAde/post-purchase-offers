@@ -7,6 +7,18 @@
   html, body, #root { margin: 0; height: 100%; }
   /* The Wix dashboard host sets this font; plain elements such as tables inherit it. */
   body { font-family: Madefor, 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; color: #000624; }
+  /* Solid white modal card with crisp Wix shadow */
+  [data-hook="custom-modal-layout"], [role="dialog"], div[class*="modalLayout"], div[class*="CustomModalLayout"] {
+    background: #ffffff !important;
+    border-radius: 8px !important;
+    box-shadow: 0 16px 48px rgba(0, 6, 36, 0.28) !important;
+    overflow: hidden;
+  }
+  /* Proper dimmed backdrop behind modal */
+  div[class*="overlay"], div[class*="backdrop"], div[class*="Overlay"] {
+    background-color: rgba(0, 6, 36, 0.5) !important;
+    backdrop-filter: blur(3px);
+  }
 </style>
 </head>
 <body>

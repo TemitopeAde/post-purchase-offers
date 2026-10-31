@@ -2,7 +2,7 @@ import { window as wixWindow } from '@wix/site-window';
 import { currentCartV2 } from '@wix/ecom';
 import { ecom } from '@wix/site-ecom';
 import { httpClient } from '@wix/essentials';
-import { detectLocale, translate, type Locale } from '../../../../lib/i18n';
+import { detectLocale, translate, subscribeToLocaleChanges, SUPPORTED_LOCALES, type Locale } from '../../../../lib/i18n';
 
 const fetchWithAuth = httpClient.fetchWithAuth || fetch;
 
@@ -16,6 +16,7 @@ type VariantSelection = {
 class PostPurchaseOffersElement extends HTMLElement {
   static get observedAttributes() {
     return [
+      'locale',
       'order-id',
       'heading',
       'heading-font',
@@ -58,6 +59,7 @@ class PostPurchaseOffersElement extends HTMLElement {
   private isInitializing = false;
   private escapeHandler: ((event: KeyboardEvent) => void) | null = null;
   private locale: Locale = detectLocale();
+  private unsubscribeLocale: (() => void) | null = null;
 
   constructor() {
     super();
@@ -130,7 +132,7 @@ class PostPurchaseOffersElement extends HTMLElement {
           offerPrice: 22.49,
           discountType: 'PERCENTAGE',
           discountValue: 25,
-          badge: '25% OFF',
+          badge: this.t('savePercent', { percent: 25 }),
           reason: this.t('previewReason'),
         },
       ],
@@ -143,10 +145,46 @@ class PostPurchaseOffersElement extends HTMLElement {
       hasOrderId: Boolean(this.getAttribute('order-id')),
       hostTag: this.tagName.toLowerCase(),
     });
+
+    const attrLocale = this.getAttribute('locale');
+    if (attrLocale && SUPPORTED_LOCALES.includes(attrLocale as Locale)) {
+      this.locale = attrLocale as Locale;
+    }
+
+    this.unsubscribeLocale = subscribeToLocaleChanges((newLocale) => {
+      if (this.locale !== newLocale) {
+        this.log('Locale changed via subscription', { from: this.locale, to: newLocale });
+        this.locale = newLocale;
+        if (this.offersData?.source === 'preview') {
+          this.loadEditorPreview();
+        }
+        if (this.hasFetched) {
+          this.render();
+        }
+      }
+    });
+
     await this.startInit();
   }
 
+  disconnectedCallback() {
+    this.unsubscribeLocale?.();
+    this.unsubscribeLocale = null;
+    this.removeEscapeHandler();
+  }
+
   attributeChangedCallback(name: string, oldValue: string, newValue: string) {
+    if (name === 'locale' && newValue && newValue !== oldValue) {
+      if (SUPPORTED_LOCALES.includes(newValue as Locale)) {
+        this.locale = newValue as Locale;
+        if (this.offersData?.source === 'preview') {
+          this.loadEditorPreview();
+        }
+        if (this.hasFetched) {
+          this.render();
+        }
+      }
+    }
     if (name === 'order-id') {
       this.log('order-id attribute changed', {
         hadOrderId: Boolean(oldValue),
@@ -177,7 +215,12 @@ class PostPurchaseOffersElement extends HTMLElement {
   }
 
   private async init() {
-    this.locale = detectLocale();
+    const attrLocale = this.getAttribute('locale');
+    if (attrLocale && SUPPORTED_LOCALES.includes(attrLocale as Locale)) {
+      this.locale = attrLocale as Locale;
+    } else {
+      this.locale = detectLocale();
+    }
     const isEditor = await this.isEditorMode();
     // Read the prop after the async view-mode check because Wix may attach
     // order-id after connectedCallback has already fired.
@@ -189,6 +232,12 @@ class PostPurchaseOffersElement extends HTMLElement {
     });
 
     if (isEditor && !orderId) {
+      try {
+        const setRes = await fetchWithAuth(apiUrl('/api/settings')).then((r) => (r.ok ? r.json() : null));
+        if (setRes?.locale && SUPPORTED_LOCALES.includes(setRes.locale as Locale) && !attrLocale) {
+          this.locale = setRes.locale as Locale;
+        }
+      } catch {}
       this.loadEditorPreview();
       this.hasFetched = true;
       this.render();
@@ -230,7 +279,11 @@ class PostPurchaseOffersElement extends HTMLElement {
           hasCampaign: Boolean(data?.campaign),
           offerCount: Array.isArray(data?.offers) ? data.offers.length : 0,
           source: data?.source,
+          locale: data?.locale,
         });
+        if (data?.locale && SUPPORTED_LOCALES.includes(data.locale as Locale) && !attrLocale) {
+          this.locale = data.locale as Locale;
+        }
         if (data && data.offers && data.offers.length > 0) {
           this.offersData = data;
         } else {
@@ -506,14 +559,36 @@ class PostPurchaseOffersElement extends HTMLElement {
       offerCount: offers.length,
       source,
     });
-    const heading = this.getAttribute('heading') || campaign.heading || this.t('previewHeading');
+    const isPreview = source === 'preview';
+
+    const isDefaultHeading =
+      !campaign.heading ||
+      campaign.heading === 'Special Offer' ||
+      campaign.heading === 'Post-Purchase Deals' ||
+      campaign.heading === 'A little something extra for you' ||
+      SUPPORTED_LOCALES.some((loc) => translate(loc, 'previewHeading') === campaign.heading);
+
+    const isDefaultSubheading =
+      !campaign.subheading ||
+      campaign.subheading === 'A little something extra for you!' ||
+      campaign.subheading === 'Add these complementary items to your order with one click.' ||
+      SUPPORTED_LOCALES.some((loc) => translate(loc, 'previewSubheading') === campaign.subheading);
+
+    const isDefaultCta =
+      !campaign.ctaText ||
+      campaign.ctaText === 'Add to Order' ||
+      campaign.ctaText === 'Claim Offer' ||
+      SUPPORTED_LOCALES.some(
+        (loc) => translate(loc, 'claimOffer') === campaign.ctaText || translate(loc, 'addToOrder') === campaign.ctaText
+      );
+
+    const heading = this.getAttribute('heading') || (isPreview || isDefaultHeading ? this.t('previewHeading') : campaign.heading);
     const headingColor = this.getAttribute('heading-color') || '#111827';
     const headingFont = this.getAttribute('heading-font') || '';
 
     const subheading =
       this.getAttribute('subheading') ||
-      campaign.subheading ||
-      this.t('previewSubheading');
+      (isPreview || isDefaultSubheading ? this.t('previewSubheading') : campaign.subheading);
     const subheadingColor = this.getAttribute('subheading-color') || '#6b7280';
     const subheadingFont = this.getAttribute('subheading-font') || '';
 
@@ -529,7 +604,7 @@ class PostPurchaseOffersElement extends HTMLElement {
     const badgeBgColor = this.getAttribute('badge-bg-color') || '#ebf5ff';
     const badgeTextColor = this.getAttribute('badge-text-color') || '#116dff';
 
-    const ctaText = this.getAttribute('cta-text') || campaign.ctaText || this.t('claimOffer');
+    const ctaText = this.getAttribute('cta-text') || (isPreview || isDefaultCta ? this.t('claimOffer') : campaign.ctaText);
     const buttonColor = this.getAttribute('button-color') || '#116dff';
     const buttonTextColor = this.getAttribute('button-text-color') || '#ffffff';
     const buttonFont = this.getAttribute('button-font') || '';
@@ -546,9 +621,39 @@ class PostPurchaseOffersElement extends HTMLElement {
         const isCheckoutProcessing = isOfferProcessing && this.processingAction === 'checkout';
         const isOfferAdded = this.addedOfferIds.has(offerId);
         const hasDiscount = offer.regularPrice > offer.offerPrice;
-        const localizedDiscountBadge = offer.badge || (hasDiscount
-          ? t('savePercent', { percent: Math.round(((offer.regularPrice - offer.offerPrice) / offer.regularPrice) * 100) })
-          : t('specialOffer'));
+
+        const isDefaultBadge =
+          !offer.badge ||
+          offer.badge === '25% OFF' ||
+          offer.badge.includes('% OFF') ||
+          SUPPORTED_LOCALES.some(
+            (loc) =>
+              translate(loc, 'savePercent', { percent: offer.discountValue || 25 }) === offer.badge ||
+              translate(loc, 'specialOffer') === offer.badge
+          );
+
+        const localizedDiscountBadge = isDefaultBadge
+          ? hasDiscount
+            ? t('savePercent', {
+                percent:
+                  offer.discountValue ||
+                  Math.round(((offer.regularPrice - offer.offerPrice) / offer.regularPrice) * 100),
+              })
+            : t('specialOffer')
+          : offer.badge;
+
+        const isDefaultProduct =
+          isPreview ||
+          offer.productId === 'preview-product-1' ||
+          SUPPORTED_LOCALES.some((loc) => translate(loc, 'previewProduct') === offer.productName);
+        const productName = isDefaultProduct ? t('previewProduct') : offer.productName;
+
+        const isDefaultReason =
+          !offer.reason ||
+          isPreview ||
+          offer.productId === 'preview-product-1' ||
+          SUPPORTED_LOCALES.some((loc) => translate(loc, 'previewReason') === offer.reason);
+        const reasonText = isDefaultReason && isPreview ? t('previewReason') : offer.reason;
 
         return `
           <div class="ppo-card" data-index="${idx}" style="background: ${cardBgColor}; border: 1px solid #e5e7eb; border-radius: ${borderRadius}px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 6px rgba(0,0,0,0.04); position: relative; transition: transform 0.15s ease, box-shadow 0.15s ease;">
@@ -564,15 +669,15 @@ class PostPurchaseOffersElement extends HTMLElement {
               )}px; overflow: hidden; margin-bottom: 14px;">
                 ${
                   offer.productImageUrl
-                    ? `<img src="${offer.productImageUrl}" alt="${offer.productName}" style="max-height: 100%; max-width: 100%; object-fit: contain;" />`
+                    ? `<img src="${offer.productImageUrl}" alt="${this.escapeHtml(productName)}" style="max-height: 100%; max-width: 100%; object-fit: contain;" />`
                     : `<svg width="48" height="48" fill="none" stroke="#9ca3af" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`
                 }
               </div>
-              <h3 style="${productTitleFont ? `font: ${productTitleFont};` : 'font-size: 15px; font-weight: 600;'} color: ${productTitleColor}; margin: 0 0 6px 0; line-height: 1.3;">${offer.productName}</h3>
+              <h3 style="${productTitleFont ? `font: ${productTitleFont};` : 'font-size: 15px; font-weight: 600;'} color: ${productTitleColor}; margin: 0 0 6px 0; line-height: 1.3;">${this.escapeHtml(productName)}</h3>
               ${
-                offer.reason
+                reasonText
                   ? `<p style="${reasonFont ? `font: ${reasonFont};` : 'font-size: 12px;'} color: ${reasonColor}; margin: 0 0 12px 0; line-height: 1.4; display: flex; align-items: flex-start; gap: 4px;">
-                      <span style="color: ${badgeTextColor}; font-weight: bold;">✦</span> <span>${offer.reason}</span>
+                      <span style="color: ${badgeTextColor}; font-weight: bold;">✦</span> <span>${this.escapeHtml(reasonText)}</span>
                      </p>`
                   : ''
               }

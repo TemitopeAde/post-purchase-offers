@@ -11,10 +11,7 @@ import {
   Text,
 } from '@wix/design-system';
 import '@wix/design-system/styles.global.css';
-import { detectLocale, translate } from '../../../../lib/i18n';
-
-const locale = detectLocale();
-const t = (key: Parameters<typeof translate>[1], values?: Record<string, string | number>) => translate(locale, key, values);
+import { detectLocale, translate, subscribeToLocaleChanges, type Locale } from '../../../../lib/i18n';
 
 interface ColorPickerRowProps {
   label: string;
@@ -44,9 +41,11 @@ interface FontPickerRowProps {
   label: string;
   font: string;
   onChange: (val: string) => void;
+  editLabel?: string;
+  selectLabel?: string;
 }
 
-const FontPickerRow: FC<FontPickerRowProps> = ({ label, font, onChange }) => (
+const FontPickerRow: FC<FontPickerRowProps> = ({ label, font, onChange, editLabel = 'Edit Font', selectLabel = 'Select Font' }) => (
   <SidePanel.Field>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
       <Text size="small">{label}</Text>
@@ -65,13 +64,16 @@ const FontPickerRow: FC<FontPickerRowProps> = ({ label, font, onChange }) => (
           )
         }
       >
-        {font ? t('editFont') : t('selectFont')}
+        {font ? editLabel : selectLabel}
       </Button>
     </div>
   </SidePanel.Field>
 );
 
 const Panel: FC = () => {
+  const [locale, setLocale] = useState<Locale>(detectLocale);
+  const t = (key: Parameters<typeof translate>[1], values?: Record<string, string | number>) => translate(locale, key, values);
+
   // Texts
   const [heading, setHeading] = useState(t('previewHeading'));
   const [subheading, setSubheading] = useState(t('previewSubheading'));
@@ -128,6 +130,12 @@ const Panel: FC = () => {
     widget.getProp('border-radius').then((v) => v && setBorderRadius(Number(v)));
   }, []);
 
+  useEffect(() => {
+    return subscribeToLocaleChanges((newLocale) => {
+      setLocale(newLocale);
+    });
+  }, []);
+
   const handleFontUpdate = useCallback(
     (propName: string, fontVal: string, setter: (val: string) => void) => {
       setter(fontVal);
@@ -159,7 +167,7 @@ const Panel: FC = () => {
   );
 
   return (
-    <WixDesignSystemProvider>
+    <WixDesignSystemProvider locale={locale}>
       <SidePanel width="320px" height="100vh">
         <SidePanel.Header title={t('postPurchaseSettings')} />
         <SidePanel.Content stretchVertically>
@@ -182,6 +190,8 @@ const Panel: FC = () => {
               label={t('headingFont')}
               font={headingFont}
               onChange={(f) => handleFontUpdate('heading-font', f, setHeadingFont)}
+              editLabel={t('editFont')}
+              selectLabel={t('selectFont')}
             />
             <ColorPickerRow
               label={t('headingColor')}
@@ -209,6 +219,8 @@ const Panel: FC = () => {
               label={t('subheadingFont')}
               font={subheadingFont}
               onChange={(f) => handleFontUpdate('subheading-font', f, setSubheadingFont)}
+              editLabel={t('editFont')}
+              selectLabel={t('selectFont')}
             />
             <ColorPickerRow
               label={t('subheadingColor')}
@@ -228,6 +240,8 @@ const Panel: FC = () => {
               label={t('productTitleFont')}
               font={productTitleFont}
               onChange={(f) => handleFontUpdate('product-title-font', f, setProductTitleFont)}
+              editLabel={t('editFont')}
+              selectLabel={t('selectFont')}
             />
             <ColorPickerRow
               label={t('productTitleColor')}
@@ -238,6 +252,8 @@ const Panel: FC = () => {
               label={t('priceFont')}
               font={priceFont}
               onChange={(f) => handleFontUpdate('price-font', f, setPriceFont)}
+              editLabel={t('editFont')}
+              selectLabel={t('selectFont')}
             />
             <ColorPickerRow
               label={t('priceColor')}
@@ -248,6 +264,8 @@ const Panel: FC = () => {
               label={t('recommendationNoteFont')}
               font={reasonFont}
               onChange={(f) => handleFontUpdate('reason-font', f, setReasonFont)}
+              editLabel={t('editFont')}
+              selectLabel={t('selectFont')}
             />
             <ColorPickerRow
               label={t('recommendationNoteColor')}
@@ -285,6 +303,8 @@ const Panel: FC = () => {
               label={t('buttonFont')}
               font={buttonFont}
               onChange={(f) => handleFontUpdate('button-font', f, setButtonFont)}
+              editLabel={t('editFont')}
+              selectLabel={t('selectFont')}
             />
             <ColorPickerRow
               label={t('buttonBackground')}

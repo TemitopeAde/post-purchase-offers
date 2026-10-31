@@ -102,6 +102,7 @@ export interface AppSettings {
   /** Stored plan, used only when Wix billing can't be read. */
   plan: PlanId;
   monthlyAiUsage: number;
+  locale?: string;
 }
 
 export interface BillingStatus {

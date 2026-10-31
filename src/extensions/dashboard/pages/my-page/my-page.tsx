@@ -27,7 +27,7 @@ import { BillingTab } from './BillingTab';
 import { ProductPicker } from './ProductPicker';
 import type { DashboardOverviewMetrics } from '../../../../lib/analytics';
 import { campaignFormSchema, type CampaignFormValues } from '../../../../lib/validation/campaign';
-import { getInitialLocale, localeLabel, setStoredLocale, SUPPORTED_LOCALES, translate, type Locale } from '../../../../lib/i18n';
+import { getInitialLocale, localeLabel, setStoredLocale, SUPPORTED_LOCALES, translate, broadcastLocaleChange, type Locale } from '../../../../lib/i18n';
 
 const Box = WdsBox as any;
 const { fetchWithAuth } = httpClient;
@@ -181,6 +181,12 @@ export const PostPurchaseDashboard: FC = () => {
       setOverviewMetrics(metricsRes);
       setCampaigns(Array.isArray(campsRes) ? campsRes : []);
       setSettings(setRes);
+      if (setRes?.locale && SUPPORTED_LOCALES.includes(setRes.locale as Locale)) {
+        const remoteLocale = setRes.locale as Locale;
+        setLocale(remoteLocale);
+        setStoredLocale(remoteLocale);
+        broadcastLocaleChange(remoteLocale);
+      }
       setBilling(billRes);
       if (typeof placementRes?.placedInSlot === 'boolean') {
         setPluginPlacement({ placedInSlot: placementRes.placedInSlot });
@@ -238,6 +244,30 @@ export const PostPurchaseDashboard: FC = () => {
       !billing.isDevelopment &&
       !billing.plan,
   );
+
+  const getRecommendationModeLabel = (mode: string) => {
+    switch (mode) {
+      case 'AI':
+        return t('modeAi');
+      case 'HYBRID':
+        return t('modeHybrid');
+      case 'RULES':
+        return t('rulesModeShort');
+      case 'MANUAL':
+        return t('modeManual');
+      default:
+        return mode;
+    }
+  };
+
+  const activeCampaign = campaigns.find((c) => c.status === 'active');
+  const previewDiscount = activeCampaign ? activeCampaign.discountValue : 15;
+  const previewCta = activeCampaign?.ctaText || t('addToOrder');
+  const previewCurrency = activeCampaign?.currency || overviewMetrics?.currency || 'USD';
+  const previewBasePrice = 25;
+  const previewDiscountedPrice = activeCampaign?.discountType === 'FIXED'
+    ? Math.max(0, previewBasePrice - previewDiscount)
+    : previewBasePrice * (1 - previewDiscount / 100);
 
   const openPricing = () => {
     if (billing?.upgradeUrl) {
@@ -362,6 +392,17 @@ export const PostPurchaseDashboard: FC = () => {
       );
 
       if (res.ok) {
+        // Consume the completed API response before changing the modal state.
+        // The PATCH endpoint also waits for manual offer writes before responding.
+        const savedCampaign = (await res.json()) as Campaign;
+        if (savedCampaign?._id) {
+          setCampaigns((previous) => {
+            const exists = previous.some((campaign) => campaign._id === savedCampaign._id);
+            return exists
+              ? previous.map((campaign) => campaign._id === savedCampaign._id ? savedCampaign : campaign)
+              : [savedCampaign, ...previous];
+          });
+        }
         closeCampaignModal();
         toast.success(isEditing ? t('campaignUpdated') : t('campaignActivated'));
         await fetchData();
@@ -408,6 +449,8 @@ export const PostPurchaseDashboard: FC = () => {
                   const nextLocale = event.target.value as Locale;
                   setLocale(nextLocale);
                   setStoredLocale(nextLocale);
+                  broadcastLocaleChange(nextLocale);
+                  void handleUpdateSettings({ locale: nextLocale });
                 }}
                 style={{ height: '32px', borderRadius: '4px', padding: '0 8px' }}
               >
@@ -691,12 +734,12 @@ export const PostPurchaseDashboard: FC = () => {
                                 )}
                               </td>
                               <td style={{ padding: '12px 8px' }}>
-                                <Badge skin="neutral">{camp.recommendationMode}</Badge>
+                                <Badge skin="neutral">{getRecommendationModeLabel(camp.recommendationMode)}</Badge>
                               </td>
                               <td style={{ padding: '12px 8px' }}>
                                 {camp.discountType === 'PERCENTAGE'
-                                  ? `${camp.discountValue}% OFF`
-                                  : `${formatMoney(camp.discountValue, camp.currency || overviewMetrics?.currency, locale)} OFF`}
+                                  ? t('percentOff', { percent: camp.discountValue })
+                                  : t('amountOff', { amount: formatMoney(camp.discountValue, camp.currency || overviewMetrics?.currency, locale) })}
                               </td>
                               <td style={{ padding: '12px 8px' }}>
                                 {camp.minOrderSubtotal
@@ -706,7 +749,11 @@ export const PostPurchaseDashboard: FC = () => {
                             <td style={{ padding: '12px 8px' }}>{camp.priority ?? 1}</td>
                               <td style={{ padding: '12px 8px' }}>
                                 <Badge skin={camp.status === 'active' ? 'success' : 'warning'}>
-                                  {camp.status.toUpperCase()}
+                                  {camp.status === 'active'
+                                    ? t('active').toUpperCase()
+                                    : camp.status === 'paused'
+                                    ? t('paused').toUpperCase()
+                                    : camp.status.toUpperCase()}
                                 </Badge>
                               </td>
                               <td style={{ padding: '12px 8px', textAlign: 'right' }}>
@@ -733,6 +780,7 @@ export const PostPurchaseDashboard: FC = () => {
                                     priority="tertiary"
                                     prefixIcon={<Delete />}
                                     onClick={() => setCampaignToDelete(camp)}
+                                    aria-label={t('deleteCampaign')}
                                   />
                                 </Box>
                               </td>
@@ -934,7 +982,7 @@ export const PostPurchaseDashboard: FC = () => {
                     }}
                   >
                     <Text>
-                      Any offers associated with this campaign will no longer be shown on your Thank You page.
+                      {t('deleteCampaignDescription')}
                     </Text>
                   </CustomModalLayout>
                 </Modal>
@@ -991,7 +1039,7 @@ export const PostPurchaseDashboard: FC = () => {
                         <Box style={{ flex: 1 }} direction="vertical" gap="SP1">
                           <Text weight="bold">{t('privacySecurity')}</Text>
                           <Text size="small" secondary>
-                            Recommendation requests run completely server-side. No customer data or payment details are exposed.
+                            {t('privacySecurityDescription')}
                           </Text>
                         </Box>
                       </Box>
@@ -1016,7 +1064,7 @@ export const PostPurchaseDashboard: FC = () => {
                       <Box direction="vertical" gap="SP1">
                         <Text weight="bold">{t('costUsageProtection')}</Text>
                         <Text size="small" secondary>
-                          {t('monthlyRequests', { used: settings?.monthlyAiUsage || 0, limit: aiAllowance ?? 'no plan' })}
+                          {t('monthlyRequests', { used: settings?.monthlyAiUsage || 0, limit: aiAllowance ?? t('noPlan') })}
                         </Text>
                         <div style={{ width: '100%', height: '8px', background: '#e5e7eb', borderRadius: '4px', overflow: 'hidden' }}>
                           <div
@@ -1071,15 +1119,18 @@ export const PostPurchaseDashboard: FC = () => {
                               {settings?.subheadline || t('previewSubheading')}
                             </p>
                           </div>
-                          <button style={{ background: 'transparent', border: 'none', color: '#9ca3af', fontSize: '12px', textDecoration: 'underline' }}>
-                            No thanks, dismiss
+                          <button
+                            style={{ background: 'transparent', border: 'none', color: '#9ca3af', fontSize: '12px', textDecoration: 'underline', cursor: 'pointer' }}
+                            aria-label={t('noThanks')}
+                          >
+                            {t('noThanks')}
                           </button>
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
                           <div style={{ border: '1px solid #e5e7eb', borderRadius: `${settings?.borderRadius || 8}px`, padding: '16px', position: 'relative' }}>
                             <span style={{ position: 'absolute', top: '10px', right: '10px', background: '#ebf5ff', color: '#116dff', fontSize: '10px', fontWeight: 700, padding: '3px 6px', borderRadius: '4px' }}>
-                              SAVE 15%
+                              {t('savePercent', { percent: previewDiscount })}
                             </span>
                             <div style={{ height: '120px', background: '#f9fafb', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px' }}>
                               <span style={{ fontSize: '32px' }}>⚡️</span>
@@ -1087,8 +1138,12 @@ export const PostPurchaseDashboard: FC = () => {
                             <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>{t('previewProduct')}</div>
                             <div style={{ fontSize: '12px', color: '#4b5563', marginBottom: '12px' }}>{t('previewReason')}</div>
                             <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '12px' }}>
-                              <span style={{ fontSize: '16px', fontWeight: 700 }}>$21.25</span>
-                              <span style={{ fontSize: '12px', color: '#9ca3af', textDecoration: 'line-through' }}>$25.00</span>
+                              <span style={{ fontSize: '16px', fontWeight: 700 }}>
+                                {formatMoney(previewDiscountedPrice, previewCurrency, locale)}
+                              </span>
+                              <span style={{ fontSize: '12px', color: '#9ca3af', textDecoration: 'line-through' }}>
+                                {formatMoney(previewBasePrice, previewCurrency, locale)}
+                              </span>
                             </div>
                             <button
                               style={{
@@ -1100,9 +1155,10 @@ export const PostPurchaseDashboard: FC = () => {
                                 padding: '8px 12px',
                                 fontSize: '13px',
                                 fontWeight: 600,
+                                cursor: 'pointer',
                               }}
                             >
-                              Add to Order →
+                              {previewCta}
                             </button>
                           </div>
                         </div>

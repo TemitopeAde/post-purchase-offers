@@ -35,6 +35,7 @@ let memorySettings: AppSettings = {
   enableAiExplanations: true,
   plan: 'Pro',
   monthlyAiUsage: 0,
+  locale: 'en',
 };
 
 const getStartOfCurrentMonth = () => {

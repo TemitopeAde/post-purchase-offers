@@ -1,4 +1,5 @@
 import type { Campaign, Offer, ProductCandidate } from '../types';
+import { resolveLocale, translate } from '../i18n';
 import { getCampaigns, getOffersByCampaign, getAppSettings, recordOfferEvent, getMonthlyAiUsage } from '../wix/data';
 import { getPlanContext } from '../wix/billing';
 import { getProductCandidates, getProductDetails } from '../wix/catalog';
@@ -17,6 +18,7 @@ export interface RecommendationResponse {
   offers: Offer[];
   orderId?: string;
   source: 'ai' | 'rules' | 'manual' | 'hybrid';
+  locale: string;
 }
 
 export function isCampaignEligible(campaign: Campaign, order: OrderContext): boolean {
@@ -224,21 +226,23 @@ export async function generateOffersForOrder(
     return null;
   }
 
+  const configuredLocale = resolveLocale(settings.locale);
   return {
     campaign: {
       id: campaign._id || 'default',
       name: campaign.name,
-      heading: campaign.displayHeading || settings.headline || 'A little something extra for you',
+      heading: campaign.displayHeading || settings.headline || translate(configuredLocale, 'previewHeading'),
       subheading:
         campaign.displaySubheading ||
         settings.subheadline ||
-        'Complementary picks tailored to your recent order.',
-      ctaText: campaign.ctaText || 'Claim Offer',
+        translate(configuredLocale, 'previewSubheading'),
+      ctaText: campaign.ctaText || translate(configuredLocale, 'claimOffer'),
     },
     offers: campaign.recommendationMode === 'MANUAL'
       ? finalOffers
       : finalOffers.slice(0, maxOffers),
     orderId: order.orderId,
     source,
+    locale: configuredLocale,
   };
 }

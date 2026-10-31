@@ -283,6 +283,17 @@ const ES: Partial<Record<TranslationKey, string>> = {
   usedProgressAria: '{label} utilizado',
   usedMonthlyRecommendations: 'Has utilizado el {percent}% de las recomendaciones de IA de este mes',
   allowanceExceededFallback: 'Cuando se agota el límite, las ofertas siguen mostrándose utilizando la clasificación inteligente de productos hasta el próximo mes.',
+  previewHeading: 'Un detalle especial para ti',
+  previewSubheading: 'Selección complementaria adaptada a tu pedido.',
+  claimOffer: 'Reclamar oferta',
+  addToOrder: 'Añadir al pedido →',
+  savePercent: 'AHORRA {percent}%',
+  previewProduct: 'Cargador rápido y cable de alta velocidad',
+  previewReason: '✦ Accesorio de carga ideal para tu nuevo dispositivo.',
+  chooseOption: 'Elegir {option}',
+  unavailableCombination: 'Esa combinación no está disponible. Elige otra opción.',
+  loading: 'Cargando',
+  saveRecommendedItems: '¡Ahorra un {percent}% en estos artículos recomendados!',
 };
 
 const FR: Partial<Record<TranslationKey, string>> = {
@@ -300,6 +311,17 @@ const FR: Partial<Record<TranslationKey, string>> = {
   usedProgressAria: '{label} utilisé',
   usedMonthlyRecommendations: 'Vous avez utilisé {percent} % des recommandations IA de ce mois-ci',
   allowanceExceededFallback: 'Lorsque le forfait est épuisé, les offres continuent de s’afficher grâce au classement intelligent des produits jusqu’au mois prochain.',
+  previewHeading: 'Un petit supplément pour vous',
+  previewSubheading: 'Sélections complémentaires adaptées à votre commande.',
+  claimOffer: 'Profiter de l’offre',
+  addToOrder: 'Ajouter à la commande →',
+  savePercent: '-{percent} %',
+  previewProduct: 'Chargeur rapide et câble haute vitesse',
+  previewReason: '✦ Accessoire de charge idéal pour votre nouvel appareil.',
+  chooseOption: 'Choisir {option}',
+  unavailableCombination: 'Cette combinaison est indisponible. Veuillez choisir une autre option.',
+  loading: 'Chargement',
+  saveRecommendedItems: 'Économisez {percent} % sur ces articles recommandés !',
 };
 
 const DE: Partial<Record<TranslationKey, string>> = {
@@ -317,32 +339,92 @@ const DE: Partial<Record<TranslationKey, string>> = {
   usedProgressAria: '{label} verwendet',
   usedMonthlyRecommendations: 'Sie haben {percent}% der KI-Empfehlungen dieses Monats verbraucht',
   allowanceExceededFallback: 'Wenn das Kontingent erschöpft ist, werden Angebote bis zum nächsten Monat weiterhin über das intelligente Produktranking angezeigt.',
+  previewHeading: 'Eine kleine Aufmerksamkeit für Sie',
+  previewSubheading: 'Passende Empfehlungen speziell für Ihre Bestellung.',
+  claimOffer: 'Angebot sichern',
+  addToOrder: 'Zur Bestellung hinzufügen →',
+  savePercent: '{percent}% SPAREN',
+  previewProduct: 'High-Speed-Schnellladegerät & Kabel',
+  previewReason: '✦ Ideales Ladezubehör für Ihr neues Gerät.',
+  chooseOption: '{option} auswählen',
+  unavailableCombination: 'Diese Kombination ist nicht verfügbar. Bitte wählen Sie eine andere Option.',
+  loading: 'Wird geladen',
+  saveRecommendedItems: 'Sparen Sie {percent}% auf diese empfohlenen Artikel!',
 };
 
 const CORE_TRANSLATIONS: Record<Exclude<Locale, 'en' | 'es' | 'fr' | 'de'>, Partial<Record<TranslationKey, string>>> = {
-  pt: { language: 'Idioma', refresh: 'Atualizar', createCampaign: 'Criar campanha', overview: 'Visão geral', campaigns: 'Campanhas', smartRecommendations: 'Recomendações inteligentes', billingPlan: 'Faturamento e plano', addToCart: 'Adicionar ao carrinho', addingToCart: 'Adicionando ao carrinho...', addedToCart: 'Adicionado ao carrinho ✓', chooseOptions: 'Escolher opções', continue: 'Continuar', cancel: 'Cancelar', noThanks: 'Não, obrigado, dispensar', findingDeals: 'A encontrar ofertas exclusivas para a sua encomenda...', specialOffer: 'Oferta especial' },
-  it: { language: 'Lingua', refresh: 'Aggiorna', createCampaign: 'Crea campagna', overview: 'Panoramica', campaigns: 'Campagne', smartRecommendations: 'Raccomandazioni intelligenti', billingPlan: 'Fatturazione e piano', addToCart: 'Aggiungi al carrello', addingToCart: 'Aggiunta al carrello...', addedToCart: 'Aggiunto al carrello ✓', chooseOptions: 'Scegli opzioni', continue: 'Continua', cancel: 'Annulla', noThanks: 'No grazie, ignora', findingDeals: 'Ricerca di offerte esclusive per il tuo ordine...', specialOffer: 'Offerta speciale' },
-  nl: { language: 'Taal', refresh: 'Vernieuwen', createCampaign: 'Campagne maken', overview: 'Overzicht', campaigns: 'Campagnes', smartRecommendations: 'Slimme aanbevelingen', billingPlan: 'Facturering en abonnement', addToCart: 'Aan winkelwagen toevoegen', addingToCart: 'Wordt toegevoegd...', addedToCart: 'Toegevoegd aan winkelwagen ✓', chooseOptions: 'Opties kiezen', continue: 'Doorgaan', cancel: 'Annuleren', noThanks: 'Nee bedankt, sluiten', findingDeals: 'Exclusieve aanbiedingen voor je bestelling zoeken...', specialOffer: 'Speciale aanbieding' },
-  pl: { language: 'Język', refresh: 'Odśwież', createCampaign: 'Utwórz kampanię', overview: 'Przegląd', campaigns: 'Kampanie', smartRecommendations: 'Inteligentne rekomendacje', billingPlan: 'Rozliczenia i plan', addToCart: 'Dodaj do koszyka', addingToCart: 'Dodawanie do koszyka...', addedToCart: 'Dodano do koszyka ✓', chooseOptions: 'Wybierz opcje', continue: 'Dalej', cancel: 'Anuluj', noThanks: 'Nie, dziękuję', findingDeals: 'Wyszukiwanie wyjątkowych ofert dla Twojego zamówienia...', specialOffer: 'Oferta specjalna' },
-  sv: { language: 'Språk', refresh: 'Uppdatera', createCampaign: 'Skapa kampanj', overview: 'Översikt', campaigns: 'Kampanjer', smartRecommendations: 'Smarta rekommendationer', billingPlan: 'Fakturering och plan', addToCart: 'Lägg i kundvagn', addingToCart: 'Lägger till...', addedToCart: 'Tillagd i kundvagn ✓', chooseOptions: 'Välj alternativ', continue: 'Fortsätt', cancel: 'Avbryt', noThanks: 'Nej tack, stäng', findingDeals: 'Letar efter exklusiva erbjudanden för din beställning...', specialOffer: 'Specialerbjudande' },
-  da: { language: 'Sprog', refresh: 'Opdater', createCampaign: 'Opret kampagne', overview: 'Oversigt', campaigns: 'Kampagner', smartRecommendations: 'Smarte anbefalinger', billingPlan: 'Fakturering og plan', addToCart: 'Læg i kurv', addingToCart: 'Tilføjer...', addedToCart: 'Lagt i kurv ✓', chooseOptions: 'Vælg muligheder', continue: 'Fortsæt', cancel: 'Annuller', noThanks: 'Nej tak, luk', findingDeals: 'Finder eksklusive tilbud til din ordre...', specialOffer: 'Særligt tilbud' },
-  no: { language: 'Språk', refresh: 'Oppdater', createCampaign: 'Opprett kampanje', overview: 'Oversikt', campaigns: 'Kampanjer', smartRecommendations: 'Smarte anbefalinger', billingPlan: 'Fakturering og plan', addToCart: 'Legg i handlekurv', addingToCart: 'Legger til...', addedToCart: 'Lagt i handlekurv ✓', chooseOptions: 'Velg alternativer', continue: 'Fortsett', cancel: 'Avbryt', noThanks: 'Nei takk, lukk', findingDeals: 'Finner eksklusive tilbud for bestillingen din...', specialOffer: 'Spesialtilbud' },
-  fi: { language: 'Kieli', refresh: 'Päivitä', createCampaign: 'Luo kampanja', overview: 'Yleiskatsaus', campaigns: 'Kampanjat', smartRecommendations: 'Älykkäät suositukset', billingPlan: 'Laskutus ja paketti', addToCart: 'Lisää ostoskoriin', addingToCart: 'Lisätään...', addedToCart: 'Lisätty ostoskoriin ✓', chooseOptions: 'Valitse vaihtoehdot', continue: 'Jatka', cancel: 'Peruuta', noThanks: 'Ei kiitos, sulje', findingDeals: 'Etsitään tilauksellesi ainutlaatuisia tarjouksia...', specialOffer: 'Erikoistarjous' },
-  cs: { language: 'Jazyk', refresh: 'Obnovit', createCampaign: 'Vytvořit kampaň', overview: 'Přehled', campaigns: 'Kampaně', smartRecommendations: 'Chytrá doporučení', billingPlan: 'Fakturace a plán', addToCart: 'Přidat do košíku', addingToCart: 'Přidávání...', addedToCart: 'Přidáno do košíku ✓', chooseOptions: 'Vyberte možnosti', continue: 'Pokračovat', cancel: 'Zrušit', noThanks: 'Ne, děkuji', findingDeals: 'Hledání exkluzivních nabídek pro vaši objednávku...', specialOffer: 'Speciální nabídka' },
-  tr: { language: 'Dil', refresh: 'Yenile', createCampaign: 'Kampanya oluştur', overview: 'Genel bakış', campaigns: 'Kampanyalar', smartRecommendations: 'Akıllı öneriler', billingPlan: 'Faturalandırma ve plan', addToCart: 'Sepete ekle', addingToCart: 'Sepete ekleniyor...', addedToCart: 'Sepete eklendi ✓', chooseOptions: 'Seçenekleri belirle', continue: 'Devam', cancel: 'İptal', noThanks: 'Hayır teşekkürler, kapat', findingDeals: 'Siparişiniz için özel fırsatlar aranıyor...', specialOffer: 'Özel teklif' },
-  ja: { language: '言語', refresh: '更新', createCampaign: 'キャンペーンを作成', overview: '概要', campaigns: 'キャンペーン', smartRecommendations: 'スマートなおすすめ', billingPlan: '請求とプラン', addToCart: 'カートに追加', addingToCart: '追加中...', addedToCart: 'カートに追加しました ✓', chooseOptions: 'オプションを選択', continue: '続行', cancel: 'キャンセル', noThanks: '結構です', findingDeals: 'ご注文に合わせた限定オファーを検索しています...', specialOffer: '特別オファー' },
-  ko: { language: '언어', refresh: '새로 고침', createCampaign: '캠페인 만들기', overview: '개요', campaigns: '캠페인', smartRecommendations: '스마트 추천', billingPlan: '결제 및 요금제', addToCart: '장바구니에 추가', addingToCart: '추가 중...', addedToCart: '장바구니에 추가됨 ✓', chooseOptions: '옵션 선택', continue: '계속', cancel: '취소', noThanks: '괜찮습니다', findingDeals: '주문에 맞는 특별 혜택을 찾는 중...', specialOffer: '특별 혜택' },
-  zh: { language: '语言', refresh: '刷新', createCampaign: '创建活动', overview: '概览', campaigns: '活动', smartRecommendations: '智能推荐', billingPlan: '账单与套餐', addToCart: '加入购物车', addingToCart: '正在加入购物车...', addedToCart: '已加入购物车 ✓', chooseOptions: '选择选项', continue: '继续', cancel: '取消', noThanks: '不用了，谢谢', findingDeals: '正在为您的订单查找专属优惠...', specialOffer: '特别优惠' },
-  ar: { language: 'اللغة', refresh: 'تحديث', createCampaign: 'إنشاء حملة', overview: 'نظرة عامة', campaigns: 'الحملات', smartRecommendations: 'توصيات ذكية', billingPlan: 'الفوترة والخطة', addToCart: 'أضف إلى السلة', addingToCart: 'جارٍ الإضافة...', addedToCart: 'تمت الإضافة إلى السلة ✓', chooseOptions: 'اختر الخيارات', continue: 'متابعة', cancel: 'إلغاء', noThanks: 'لا شكرًا، إغلاق', findingDeals: 'جارٍ العثور على عروض حصرية لطلبك...', specialOffer: 'عرض خاص' },
-  he: { language: 'שפה', refresh: 'רענון', createCampaign: 'יצירת קמפיין', overview: 'סקירה', campaigns: 'קמפיינים', smartRecommendations: 'המלצות חכמות', billingPlan: 'חיוב ותוכנית', addToCart: 'הוסף לסל', addingToCart: 'מוסיף לסל...', addedToCart: 'נוסף לסל ✓', chooseOptions: 'בחירת אפשרויות', continue: 'המשך', cancel: 'ביטול', noThanks: 'לא תודה, סגירה', findingDeals: 'מחפש הצעות בלעדיות להזמנה שלך...', specialOffer: 'הצעה מיוחדת' },
-  ru: { language: 'Язык', refresh: 'Обновить', createCampaign: 'Создать кампанию', overview: 'Обзор', campaigns: 'Кампании', smartRecommendations: 'Умные рекомендации', billingPlan: 'Оплата и тариф', addToCart: 'Добавить в корзину', addingToCart: 'Добавление...', addedToCart: 'Добавлено в корзину ✓', chooseOptions: 'Выберите параметры', continue: 'Продолжить', cancel: 'Отмена', noThanks: 'Нет, спасибо', findingDeals: 'Ищем эксклюзивные предложения для вашего заказа...', specialOffer: 'Специальное предложение' },
+  pt: { language: 'Idioma', refresh: 'Atualizar', createCampaign: 'Criar campanha', overview: 'Visão geral', campaigns: 'Campanhas', smartRecommendations: 'Recomendações inteligentes', billingPlan: 'Faturamento e plano', addToCart: 'Adicionar ao carrinho', addingToCart: 'Adicionando ao carrinho...', addedToCart: 'Adicionado ao carrinho ✓', chooseOptions: 'Escolher opções', continue: 'Continuar', cancel: 'Cancelar', noThanks: 'Não, obrigado, dispensar', findingDeals: 'A encontrar ofertas exclusivas para a sua encomenda...', specialOffer: 'Oferta especial', previewHeading: 'Um detalhe especial para si', previewSubheading: 'Sugestões complementares adaptadas à sua encomenda.', claimOffer: 'Aproveitar oferta', addToOrder: 'Adicionar à encomenda →', savePercent: 'POUPE {percent}%', previewProduct: 'Carregador rápido e cabo de alta velocidade', previewReason: '✦ Acessório de carregamento ideal para o seu novo dispositivo.', dismissOffer: 'Dispensar oferta', chooseOption: 'Escolher {option}', loading: 'A carregar' },
+  it: { language: 'Lingua', refresh: 'Aggiorna', createCampaign: 'Crea campagna', overview: 'Panoramica', campaigns: 'Campagne', smartRecommendations: 'Raccomandazioni intelligenti', billingPlan: 'Fatturazione e piano', addToCart: 'Aggiungi al carrello', addingToCart: 'Aggiunta al carrello...', addedToCart: 'Aggiunto al carrello ✓', chooseOptions: 'Scegli opzioni', continue: 'Continua', cancel: 'Annulla', noThanks: 'No grazie, ignora', findingDeals: 'Ricerca di offerte esclusive per il tuo ordine...', specialOffer: 'Offerta speciale', previewHeading: 'Un piccolo extra per te', previewSubheading: 'Consigli complementari per il tuo ordine.', claimOffer: 'Richiedi offerta', addToOrder: 'Aggiungi all’ordine →', savePercent: 'RISPARMIA IL {percent}%', previewProduct: 'Caricatore rapido e cavo ad alta velocità', previewReason: '✦ Accessorio ideale per il tuo nuovo dispositivo.', dismissOffer: 'Ignora offerta', chooseOption: 'Scegli {option}', loading: 'Caricamento' },
+  nl: { language: 'Taal', refresh: 'Vernieuwen', createCampaign: 'Campagne maken', overview: 'Overzicht', campaigns: 'Campagnes', smartRecommendations: 'Slimme aanbevelingen', billingPlan: 'Facturering en abonnement', addToCart: 'Aan winkelwagen toevoegen', addingToCart: 'Wordt toegevoegd...', addedToCart: 'Toegevoegd aan winkelwagen ✓', chooseOptions: 'Opties kiezen', continue: 'Doorgaan', cancel: 'Annuleren', noThanks: 'Nee bedankt, sluiten', findingDeals: 'Exclusieve aanbiedingen voor je bestelling zoeken...', specialOffer: 'Speciale aanbieding', previewHeading: 'Iets extra’s voor jou', previewSubheading: 'Aanvullende suggesties voor je bestelling.', claimOffer: 'Aanbieding claimen', addToOrder: 'Aan bestelling toevoegen →', savePercent: 'BESPAAR {percent}%', previewProduct: 'Snellader en snelle kabel', previewReason: '✦ Ideale laadaccessoire voor je nieuwe apparaat.', dismissOffer: 'Aanbieding sluiten', chooseOption: 'Kies {option}', loading: 'Laden' },
+  pl: { language: 'Język', refresh: 'Odśwież', createCampaign: 'Utwórz kampanię', overview: 'Przegląd', campaigns: 'Kampanie', smartRecommendations: 'Inteligentne rekomendacje', billingPlan: 'Rozliczenia i plan', addToCart: 'Dodaj do koszyka', addingToCart: 'Dodawanie do koszyka...', addedToCart: 'Dodano do koszyka ✓', chooseOptions: 'Wybierz opcje', continue: 'Dalej', cancel: 'Anuluj', noThanks: 'Nie, dziękuję', findingDeals: 'Wyszukiwanie wyjątkowych ofert dla Twojego zamówienia...', specialOffer: 'Oferta specjalna', previewHeading: 'Coś wyjątkowego dla Ciebie', claimOffer: 'Odbierz ofertę', addToOrder: 'Dodaj do zamówienia →', savePercent: 'OSZCZĘDŹ {percent}%', loading: 'Ładowanie' },
+  sv: { language: 'Språk', refresh: 'Uppdatera', createCampaign: 'Skapa kampanj', overview: 'Översikt', campaigns: 'Kampanjer', smartRecommendations: 'Smarta rekommendationer', billingPlan: 'Fakturering och plan', addToCart: 'Lägg i kundvagn', addingToCart: 'Lägger till...', addedToCart: 'Tillagd i kundvagn ✓', chooseOptions: 'Välj alternativ', continue: 'Fortsätt', cancel: 'Avbryt', noThanks: 'Nej tack, stäng', findingDeals: 'Letar efter exklusiva erbjudanden för din beställning...', specialOffer: 'Specialerbjudande', previewHeading: 'Något extra för dig', claimOffer: 'Hämta erbjudande', addToOrder: 'Lägg till i beställning →', savePercent: 'SPARA {percent}%', loading: 'Laddar' },
+  da: { language: 'Sprog', refresh: 'Opdater', createCampaign: 'Opret kampagne', overview: 'Oversigt', campaigns: 'Kampagner', smartRecommendations: 'Smarte anbefalinger', billingPlan: 'Fakturering og plan', addToCart: 'Læg i kurv', addingToCart: 'Tilføjer...', addedToCart: 'Lagt i kurv ✓', chooseOptions: 'Vælg muligheder', continue: 'Fortsæt', cancel: 'Annuller', noThanks: 'Nej tak, luk', findingDeals: 'Finder eksklusive tilbud til din ordre...', specialOffer: 'Særligt tilbud', previewHeading: 'Lidt ekstra til dig', claimOffer: 'Benyt tilbud', addToOrder: 'Føj til ordre →', savePercent: 'SPAR {percent}%', loading: 'Indlæser' },
+  no: { language: 'Språk', refresh: 'Oppdater', createCampaign: 'Opprett kampanje', overview: 'Oversikt', campaigns: 'Kampanjer', smartRecommendations: 'Smarte anbefalinger', billingPlan: 'Fakturering og plan', addToCart: 'Legg i handlekurv', addingToCart: 'Legger til...', addedToCart: 'Lagt i handlekurv ✓', chooseOptions: 'Velg alternativer', continue: 'Fortsett', cancel: 'Avbryt', noThanks: 'Nei takk, lukk', findingDeals: 'Finner eksklusive tilbud for bestillingen din...', specialOffer: 'Spesialtilbud', previewHeading: 'Noe ekstra til deg', claimOffer: 'Krev tilbud', addToOrder: 'Legg til bestilling →', savePercent: 'SPAR {percent}%', loading: 'Laster' },
+  fi: { language: 'Kieli', refresh: 'Päivitä', createCampaign: 'Luo kampanja', overview: 'Yleiskatsaus', campaigns: 'Kampanjat', smartRecommendations: 'Älykkäät suositukset', billingPlan: 'Laskutus ja paketti', addToCart: 'Lisää ostoskoriin', addingToCart: 'Lisätään...', addedToCart: 'Lisätty ostoskoriin ✓', chooseOptions: 'Valitse vaihtoehdot', continue: 'Jatka', cancel: 'Peruuta', noThanks: 'Ei kiitos, sulje', findingDeals: 'Etsitään tilauksellesi ainutlaatuisia tarjouksia...', specialOffer: 'Erikoistarjous', previewHeading: 'Jotain ylimääräistä sinulle', claimOffer: 'Lunasta tarjous', addToOrder: 'Lisää tilaukseen →', savePercent: 'SÄÄSTÄ {percent}%', loading: 'Ladataan' },
+  cs: { language: 'Jazyk', refresh: 'Obnovit', createCampaign: 'Vytvořit kampaň', overview: 'Přehled', campaigns: 'Kampaně', smartRecommendations: 'Chytrá doporučení', billingPlan: 'Fakturace a plán', addToCart: 'Přidat do košíku', addingToCart: 'Přidávání...', addedToCart: 'Přidáno do košíku ✓', chooseOptions: 'Vyberte možnosti', continue: 'Pokračovat', cancel: 'Zrušit', noThanks: 'Ne, děkuji', findingDeals: 'Hledání exkluzivních nabídek pro vaši objednávku...', specialOffer: 'Speciální nabídka', previewHeading: 'Něco navíc pro vás', claimOffer: 'Získat nabídku', addToOrder: 'Přidat k objednávce →', savePercent: 'UŠETŘETE {percent}%', loading: 'Načítání' },
+  tr: { language: 'Dil', refresh: 'Yenile', createCampaign: 'Kampanya oluştur', overview: 'Genel bakış', campaigns: 'Kampanyalar', smartRecommendations: 'Akıllı öneriler', billingPlan: 'Faturalandırma ve plan', addToCart: 'Sepete ekle', addingToCart: 'Sepete ekleniyor...', addedToCart: 'Sepete eklendi ✓', chooseOptions: 'Seçenekleri belirle', continue: 'Devam', cancel: 'İptal', noThanks: 'Hayır teşekkürler, kapat', findingDeals: 'Siparişiniz için özel fırsatlar aranıyor...', specialOffer: 'Özel teklif', previewHeading: 'Sizin için özel bir fırsat', claimOffer: 'Fırsatı yakala', addToOrder: 'Siparişe ekle →', savePercent: '%{percent} İNDİRİM', loading: 'Yükleniyor' },
+  ja: { language: '言語', refresh: '更新', createCampaign: 'キャンペーンを作成', overview: '概要', campaigns: 'キャンペーン', smartRecommendations: 'スマートなおすすめ', billingPlan: '請求とプラン', addToCart: 'カートに追加', addingToCart: '追加中...', addedToCart: 'カートに追加しました ✓', chooseOptions: 'オプションを選択', continue: '続行', cancel: 'キャンセル', noThanks: '結構です', findingDeals: 'ご注文に合わせた限定オファーを検索しています...', specialOffer: '特別オファー', previewHeading: 'ご注文者様への特別オファー', claimOffer: 'オファーを受け取る', addToOrder: '注文に追加 →', savePercent: '{percent}% オフ', loading: '読み込み中' },
+  ko: { language: '언어', refresh: '새로 고침', createCampaign: '캠페인 만들기', overview: '개요', campaigns: '캠페인', smartRecommendations: '스마트 추천', billingPlan: '결제 및 요금제', addToCart: '장바구니에 추가', addingToCart: '추가 중...', addedToCart: '장바구니에 추가됨 ✓', chooseOptions: '옵션 선택', continue: '계속', cancel: '취소', noThanks: '괜찮습니다', findingDeals: '주문에 맞는 특별 혜택을 찾는 중...', specialOffer: '특별 혜택', previewHeading: '고객님을 위한 특별 혜택', claimOffer: '혜택 받기', addToOrder: '주문에 추가 →', savePercent: '{percent}% 할인', loading: '로딩 중' },
+  zh: { language: '语言', refresh: '刷新', createCampaign: '创建活动', overview: '概览', campaigns: '活动', smartRecommendations: '智能推荐', billingPlan: '账单与套餐', addToCart: '加入购物车', addingToCart: '正在加入购物车...', addedToCart: '已加入购物车 ✓', chooseOptions: '选择选项', continue: '继续', cancel: '取消', noThanks: '不用了，谢谢', findingDeals: '正在为您的订单查找专属优惠...', specialOffer: '特别优惠', previewHeading: '为您准备的专属优惠', claimOffer: '领取优惠', addToOrder: '加入订单 →', savePercent: '立省 {percent}%', loading: '加载中' },
+  ar: { language: 'اللغة', refresh: 'تحديث', createCampaign: 'إنشاء حملة', overview: 'نظرة عامة', campaigns: 'الحملات', smartRecommendations: 'توصيات ذكية', billingPlan: 'الفوترة والخطة', addToCart: 'أضف إلى السلة', addingToCart: 'جارٍ الإضافة...', addedToCart: 'تمت الإضافة إلى السلة ✓', chooseOptions: 'اختر الخيارات', continue: 'متابعة', cancel: 'إلغاء', noThanks: 'لا شكرًا، إغلاق', findingDeals: 'جارٍ العثور على عروض حصرية لطلبك...', specialOffer: 'عرض خاص', previewHeading: 'عرض خاص إضافي لك', claimOffer: 'الحصول على العرض', addToOrder: 'أضف إلى الطلب ←', savePercent: 'وفّر {percent}%', loading: 'جارٍ التحميل' },
+  he: { language: 'שפה', refresh: 'רענון', createCampaign: 'יצירת קמפיין', overview: 'סקירה', campaigns: 'קמפיינים', smartRecommendations: 'המלצות חכמות', billingPlan: 'חיוב ותוכנית', addToCart: 'הוסף לסל', addingToCart: 'מוסיף לסל...', addedToCart: 'נוסף לסל ✓', chooseOptions: 'בחירת אפשרויות', continue: 'המשך', cancel: 'ביטול', noThanks: 'לא תודה, סגירה', findingDeals: 'מחפש הצעות בלעדיות להזמנה שלך...', specialOffer: 'הצעה מיוחדת', previewHeading: 'משהו מיוחד בשבילך', claimOffer: 'קבלת ההצעה', addToOrder: 'הוספה להזמנה ←', savePercent: 'חיסכון של {percent}%', loading: 'טוען' },
+  ru: { language: 'Язык', refresh: 'Обновить', createCampaign: 'Создать кампанию', overview: 'Обзор', campaigns: 'Кампании', smartRecommendations: 'Умные рекомендации', billingPlan: 'Оплата и тариф', addToCart: 'Добавить в корзину', addingToCart: 'Добавление...', addedToCart: 'Добавлено в корзину ✓', chooseOptions: 'Выберите параметры', continue: 'Продолжить', cancel: 'Отмена', noThanks: 'Нет, спасибо', findingDeals: 'Ищем эксклюзивные предложения для вашего заказа...', specialOffer: 'Специальное предложение', previewHeading: 'Специальное предложение для вас', claimOffer: 'Получить предложение', addToOrder: 'Добавить к заказу →', savePercent: 'СКИДКА {percent}%', loading: 'Загрузка' },
 };
 
 const LOCALE_NAMES: Record<Locale, string> = {
   en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch', pt: 'Português', it: 'Italiano', nl: 'Nederlands', pl: 'Polski', sv: 'Svenska', da: 'Dansk', no: 'Norsk', fi: 'Suomi', cs: 'Čeština', tr: 'Türkçe', ja: '日本語', ko: '한국어', zh: '中文', ar: 'العربية', he: 'עברית', ru: 'Русский',
 };
 
-const TRANSLATIONS: Record<Locale, Partial<Record<TranslationKey, string>>> = { en: EN, es: ES, fr: FR, de: DE, ...CORE_TRANSLATIONS };
+const CAMPAIGN_MODAL_TRANSLATIONS: Record<Locale, Partial<Record<TranslationKey, string>>> = {
+  en: {},
+  es: {
+    editCampaign: 'Editar campaña poscompra',
+    createNewCampaign: 'Crear nueva campaña poscompra',
+    updateParameters: 'Actualizar parámetros de segmentación y descuento',
+    configureParameters: 'Configurar parámetros de segmentación y descuento',
+  },
+  fr: {
+    editCampaign: 'Modifier la campagne post-achat',
+    createNewCampaign: 'Créer une campagne post-achat',
+    updateParameters: 'Mettre à jour les paramètres de ciblage et de remise',
+    configureParameters: 'Configurer les paramètres de ciblage et de remise',
+  },
+  de: {
+    editCampaign: 'Post-Kauf-Kampagne bearbeiten',
+    createNewCampaign: 'Neue Post-Kauf-Kampagne erstellen',
+    updateParameters: 'Targeting- und Rabattparameter aktualisieren',
+    configureParameters: 'Targeting- und Rabattparameter konfigurieren',
+  },
+  pt: { editCampaign: 'Editar campanha pós-compra', createNewCampaign: 'Criar nova campanha pós-compra' },
+  it: { editCampaign: 'Modifica campagna post-acquisto', createNewCampaign: 'Crea nuova campagna post-acquisto' },
+  nl: { editCampaign: 'Post-aankoopcampagne bewerken', createNewCampaign: 'Nieuwe post-aankoopcampagne maken' },
+  pl: { editCampaign: 'Edytuj kampanię po zakupie', createNewCampaign: 'Utwórz nową kampanię po zakupie' },
+  sv: { editCampaign: 'Redigera efterköpskampanj', createNewCampaign: 'Skapa ny efterköpskampanj' },
+  da: { editCampaign: 'Rediger efterkøbskampagne', createNewCampaign: 'Opret ny efterkøbskampagne' },
+  no: { editCampaign: 'Rediger etterkjøpskampanje', createNewCampaign: 'Opprett ny etterkjøpskampanje' },
+  fi: { editCampaign: 'Muokkaa oston jälkeistä kampanjaa', createNewCampaign: 'Luo uusi oston jälkeinen kampanja' },
+  cs: { editCampaign: 'Upravit kampaň po nákupu', createNewCampaign: 'Vytvořit novou kampaň po nákupu' },
+  tr: { editCampaign: 'Satın alma sonrası kampanyayı düzenle', createNewCampaign: 'Yeni satın alma sonrası kampanyası oluştur' },
+  ja: { editCampaign: '購入後キャンペーンを編集', createNewCampaign: '新しい購入後キャンペーンを作成' },
+  ko: { editCampaign: '구매 후 캠페인 편집', createNewCampaign: '새 구매 후 캠페인 만들기' },
+  zh: { editCampaign: '编辑购买后营销活动', createNewCampaign: '创建新的购买后营销活动' },
+  ar: { editCampaign: 'تحرير حملة ما بعد الشراء', createNewCampaign: 'إنشاء حملة جديدة بعد الشراء' },
+  he: { editCampaign: 'עריכת קמפיין לאחר רכישה', createNewCampaign: 'יצירת קמפיין חדש לאחר רכישה' },
+  ru: { editCampaign: 'Редактировать кампанию после покупки', createNewCampaign: 'Создать новую кампанию после покупки' },
+};
+
+const TRANSLATIONS: Record<Locale, Partial<Record<TranslationKey, string>>> = {
+  en: { ...EN, ...CAMPAIGN_MODAL_TRANSLATIONS.en },
+  es: { ...ES, ...CAMPAIGN_MODAL_TRANSLATIONS.es },
+  fr: { ...FR, ...CAMPAIGN_MODAL_TRANSLATIONS.fr },
+  de: { ...DE, ...CAMPAIGN_MODAL_TRANSLATIONS.de },
+  ...Object.fromEntries(
+    Object.entries(CORE_TRANSLATIONS).map(([locale, translations]) => [
+      locale,
+      { ...translations, ...CAMPAIGN_MODAL_TRANSLATIONS[locale as Locale] },
+    ]),
+  ),
+} as Record<Locale, Partial<Record<TranslationKey, string>>>;
 
 export const resolveLocale = (value?: string | null): Locale => {
   const language = (value || '').toLowerCase().split(/[-_]/)[0];
@@ -350,17 +432,93 @@ export const resolveLocale = (value?: string | null): Locale => {
 };
 
 export const detectLocale = (): Locale => {
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = window.localStorage.getItem('ppo-locale');
+      if (stored) return resolveLocale(stored);
+    } catch {}
+  }
   if (typeof document !== 'undefined') return resolveLocale(document.documentElement.lang || navigator.language);
   return 'en';
 };
 
 export const getInitialLocale = (): Locale => {
-  if (typeof window !== 'undefined') return resolveLocale(window.localStorage.getItem('ppo-locale') || navigator.language);
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = window.localStorage.getItem('ppo-locale');
+      if (stored) return resolveLocale(stored);
+    } catch {}
+  }
   return 'en';
 };
 
 export const setStoredLocale = (locale: Locale) => {
-  if (typeof window !== 'undefined') window.localStorage.setItem('ppo-locale', locale);
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem('ppo-locale', locale);
+    } catch {}
+  }
+};
+
+export const broadcastLocaleChange = (locale: Locale) => {
+  setStoredLocale(locale);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('ppo:locale-change', { detail: { locale } }));
+    try {
+      window.parent?.postMessage({ type: 'ppo:locale-change', locale }, '*');
+    } catch {}
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const channel = new BroadcastChannel('ppo-locale-channel');
+        channel.postMessage({ locale });
+        channel.close();
+      }
+    } catch {}
+  }
+};
+
+export const subscribeToLocaleChanges = (callback: (locale: Locale) => void): (() => void) => {
+  if (typeof window === 'undefined') return () => {};
+
+  const handleCustomEvent = (event: Event) => {
+    const detail = (event as CustomEvent)?.detail;
+    if (detail?.locale) callback(resolveLocale(detail.locale));
+  };
+
+  const handleMessage = (event: MessageEvent) => {
+    if (event.data?.type === 'ppo:locale-change' && event.data.locale) {
+      callback(resolveLocale(event.data.locale));
+    }
+  };
+
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === 'ppo-locale' && event.newValue) {
+      callback(resolveLocale(event.newValue));
+    }
+  };
+
+  window.addEventListener('ppo:locale-change', handleCustomEvent);
+  window.addEventListener('message', handleMessage);
+  window.addEventListener('storage', handleStorage);
+
+  let channel: BroadcastChannel | null = null;
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      channel = new BroadcastChannel('ppo-locale-channel');
+      channel.onmessage = (event) => {
+        if (event.data?.locale) callback(resolveLocale(event.data.locale));
+      };
+    }
+  } catch {}
+
+  return () => {
+    window.removeEventListener('ppo:locale-change', handleCustomEvent);
+    window.removeEventListener('message', handleMessage);
+    window.removeEventListener('storage', handleStorage);
+    try {
+      channel?.close();
+    } catch {}
+  };
 };
 
 export const translate = (locale: Locale, key: TranslationKey, values: Record<string, string | number> = {}): string => {

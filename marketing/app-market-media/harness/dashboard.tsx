@@ -33,10 +33,16 @@ function typeInto(input: HTMLInputElement, value: string) {
     await wait(200);
     const input = document.querySelector<HTMLInputElement>('input[placeholder^="e.g."]');
     if (input) typeInto(input, name);
-    // Number inputs, in order: discount percentage, minimum order subtotal.
-    const [discount, minSubtotal] = document.querySelectorAll<HTMLInputElement>('input[type="number"]');
-    if (discount) typeInto(discount, '15');
-    if (minSubtotal) typeInto(minSubtotal, '40');
+    // Number inputs in form: [0] = priority, [1] = discount percentage, [2] = minimum order subtotal.
+    const numberInputs = document.querySelectorAll<HTMLInputElement>('input[type="number"]');
+    if (numberInputs.length >= 3) {
+      typeInto(numberInputs[0], '1');   // Priority: 1
+      typeInto(numberInputs[1], '15');  // Discount: 15%
+      typeInto(numberInputs[2], '40');  // Min Order Subtotal: $40
+    } else if (numberInputs.length === 2) {
+      typeInto(numberInputs[0], '15');
+      typeInto(numberInputs[1], '40');
+    }
     await wait(100);
     document.querySelector('input[placeholder^="e.g."]')?.scrollIntoView({ block: 'center' });
   }
