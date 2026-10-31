@@ -43,6 +43,7 @@ export const PostPurchaseDashboard: FC = () => {
 
   // New campaign modal form state
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [campaignToEdit, setCampaignToEdit] = useState<Campaign | null>(null);
   const [newCampaignName, setNewCampaignName] = useState('');
   const [newCampaignDiscount, setNewCampaignDiscount] = useState('15');
   const [newCampaignMode, setNewCampaignMode] = useState<CampaignFormValues['mode']>('AI');
@@ -52,6 +53,40 @@ export const PostPurchaseDashboard: FC = () => {
   const [isTogglingCampaign, setIsTogglingCampaign] = useState(false);
   const [campaignToDelete, setCampaignToDelete] = useState<Campaign | null>(null);
   const [isDeletingCampaign, setIsDeletingCampaign] = useState(false);
+  const canUseAiRecommendations = Boolean(billing?.isDevelopment || billing?.plan);
+
+  const resetCampaignForm = () => {
+    setNewCampaignName('');
+    setNewCampaignDiscount('15');
+    setNewCampaignMinSubtotal('0');
+    setNewCampaignMode(canUseAiRecommendations ? 'AI' : 'RULES');
+  };
+
+  const closeCampaignModal = () => {
+    if (isSavingCampaign) return;
+    setShowCreateModal(false);
+    setCampaignToEdit(null);
+    resetCampaignForm();
+  };
+
+  const openCreateCampaign = () => {
+    setCampaignToEdit(null);
+    resetCampaignForm();
+    setShowCreateModal(true);
+  };
+
+  const openEditCampaign = (campaign: Campaign) => {
+    setCampaignToEdit(campaign);
+    setNewCampaignName(campaign.name);
+    setNewCampaignDiscount(String(campaign.discountValue ?? 0));
+    setNewCampaignMinSubtotal(String(campaign.minOrderSubtotal ?? 0));
+    setNewCampaignMode(
+      campaign.recommendationMode === 'AI' && !canUseAiRecommendations
+        ? 'RULES'
+        : campaign.recommendationMode as CampaignFormValues['mode'],
+    );
+    setShowCreateModal(true);
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -173,7 +208,7 @@ export const PostPurchaseDashboard: FC = () => {
     }
   };
 
-  const handleCreateCampaign = async () => {
+  const handleSaveCampaign = async () => {
     const parsed = campaignFormSchema.safeParse({
       name: newCampaignName,
       discount: newCampaignDiscount,
@@ -186,43 +221,49 @@ export const PostPurchaseDashboard: FC = () => {
       return;
     }
 
+    if (parsed.data.mode === 'AI' && !canUseAiRecommendations) {
+      toast.error('AI recommendations require a Pro or Business plan.');
+      return;
+    }
+
     setIsSavingCampaign(true);
     try {
-      const res = await fetchWithAuth('/api/campaigns', {
-        method: 'POST',
+      const isEditing = Boolean(campaignToEdit?._id);
+      const res = await fetchWithAuth(
+        isEditing ? `/api/campaigns/${campaignToEdit?._id}` : '/api/campaigns',
+        {
+        method: isEditing ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: parsed.data.name,
-          status: 'active',
-          priority: 5,
+          ...(isEditing ? {} : { status: 'active', priority: 5 }),
           minOrderSubtotal: parsed.data.minSubtotal,
-          currency: 'USD',
           recommendationMode: parsed.data.mode,
-          maxOffers: 2,
-          fallbackMode: 'RULES',
           discountType: 'PERCENTAGE',
           discountValue: parsed.data.discount,
-          displayHeading: 'Special add-on offer for your order',
-          displaySubheading: `Save ${newCampaignDiscount}% on these recommended items!`,
-          ctaText: 'Claim Offer',
+          ...(isEditing ? {} : {
+            currency: 'USD',
+            maxOffers: 2,
+            fallbackMode: 'RULES',
+            displayHeading: 'Special add-on offer for your order',
+            ctaText: 'Claim Offer',
+          }),
+          displaySubheading: `Save ${parsed.data.discount}% on these recommended items!`,
         }),
-      });
+        },
+      );
 
       if (res.ok) {
-        setShowCreateModal(false);
-        setNewCampaignName('');
-        setNewCampaignDiscount('15');
-        setNewCampaignMinSubtotal('0');
-        setNewCampaignMode('AI');
-        toast.success('Campaign created and activated');
+        closeCampaignModal();
+        toast.success(isEditing ? 'Campaign updated' : 'Campaign created and activated');
         await fetchData();
       } else {
         const err = (await res.json().catch(() => ({}))) as { error?: string };
-        toast.error(err.error || 'Failed to create campaign');
+        toast.error(err.error || (isEditing ? 'Failed to update campaign' : 'Failed to create campaign'));
       }
     } catch (err) {
-      console.error('Error creating campaign:', err);
-      toast.error('Could not create campaign. Please try again.');
+      console.error('Error saving campaign:', err);
+      toast.error('Could not save campaign. Please try again.');
     } finally {
       setIsSavingCampaign(false);
     }
@@ -264,7 +305,7 @@ export const PostPurchaseDashboard: FC = () => {
                 skin="standard"
                 priority="primary"
                 prefixIcon={<Add />}
-                onClick={() => setShowCreateModal(true)}
+                onClick={openCreateCampaign}
               >
                 Create Campaign
               </Button>
@@ -448,7 +489,7 @@ export const PostPurchaseDashboard: FC = () => {
                       <Button
                         size="small"
                         prefixIcon={<Add />}
-                        onClick={() => setShowCreateModal(true)}
+                        onClick={openCreateCampaign}
                       >
                         New Campaign
                       </Button>
@@ -505,6 +546,14 @@ export const PostPurchaseDashboard: FC = () => {
                                     size="tiny"
                                     skin="standard"
                                     priority="secondary"
+                                    onClick={() => openEditCampaign(camp)}
+                                  >
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    size="tiny"
+                                    skin="standard"
+                                    priority="secondary"
                                     onClick={() => setCampaignToToggle(camp)}
                                   >
                                     {camp.status === 'active' ? 'Pause' : 'Activate'}
@@ -528,25 +577,25 @@ export const PostPurchaseDashboard: FC = () => {
 
                 <Modal
                   isOpen={showCreateModal}
-                  onRequestClose={() => setShowCreateModal(false)}
+                  onRequestClose={closeCampaignModal}
                   shouldCloseOnOverlayClick={!isSavingCampaign}
                   screen="desktop"
                 >
                   <CustomModalLayout
-                    title="Create New Post-Purchase Campaign"
-                    subtitle="Configure targeting and discount parameters"
+                    title={campaignToEdit ? 'Edit Post-Purchase Campaign' : 'Create New Post-Purchase Campaign'}
+                    subtitle={campaignToEdit ? 'Update targeting and discount parameters' : 'Configure targeting and discount parameters'}
                     width="600px"
                     maxHeight="640px"
                     overflowY="auto"
                     showHeaderDivider={false}
                     showFooterDivider={false}
-                    closeButtonProps={{ size: 'small', onClick: () => setShowCreateModal(false) }}
-                    primaryButtonText={isSavingCampaign ? 'Creating...' : 'Save & Activate'}
+                    closeButtonProps={{ size: 'small', onClick: closeCampaignModal }}
+                    primaryButtonText={isSavingCampaign ? 'Saving...' : campaignToEdit ? 'Save Changes' : 'Save & Activate'}
                     primaryButtonProps={{ disabled: isSavingCampaign }}
-                    primaryButtonOnClick={handleCreateCampaign}
+                    primaryButtonOnClick={handleSaveCampaign}
                     secondaryButtonText="Cancel"
                     secondaryButtonProps={{ skin: 'dark', priority: 'secondary', disabled: isSavingCampaign }}
-                    secondaryButtonOnClick={() => setShowCreateModal(false)}
+                    secondaryButtonOnClick={closeCampaignModal}
                     content={
                       <Box direction="vertical" gap="SP3">
                         <FormField label="Campaign Name" required>
@@ -561,11 +610,22 @@ export const PostPurchaseDashboard: FC = () => {
                         <FormField label="Recommendation Mode">
                           <select
                             value={newCampaignMode}
-                            onChange={(e) => setNewCampaignMode(e.target.value as CampaignFormValues['mode'])}
+                            onChange={(e) => {
+                              const mode = e.target.value as CampaignFormValues['mode'];
+                              if (mode === 'AI' && !canUseAiRecommendations) {
+                                toast.error('AI recommendations require a Pro or Business plan.');
+                                return;
+                              }
+                              setNewCampaignMode(mode);
+                            }}
                             aria-label="Recommendation Mode"
                             style={{ width: '100%', height: '36px', borderRadius: '4px', border: '1px solid #c4cdd5', padding: '0 8px' }}
                           >
-                            <option value="AI">Automatic Smart Recommendations</option>
+                            <option value="AI" disabled={!canUseAiRecommendations}>
+                              {canUseAiRecommendations
+                                ? 'Automatic Smart Recommendations'
+                                : 'Automatic Smart Recommendations (Pro or Business required)'}
+                            </option>
                             <option value="HYBRID">Hybrid (Merchant + Smart Rules)</option>
                             <option value="RULES">Deterministic Rules (Category & Price)</option>
                             <option value="MANUAL">Manual Products Only</option>

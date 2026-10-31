@@ -14,7 +14,10 @@ export interface PlanContext {
   isDevelopment: boolean;
 }
 
-export const isDevelopmentEnvironment = () => process.env.ENVIRONMENT === 'development';
+export const isDevelopmentEnvironment = () => {
+  const environment = import.meta.env.ENVIRONMENT ?? process.env.ENVIRONMENT;
+  return environment?.toLowerCase() === 'development';
+};
 
 const DEVELOPMENT_LIMITS: PlanLimits = {
   ...PLANS.Business.limits,
@@ -32,9 +35,20 @@ export async function getPlanContext(): Promise<PlanContext> {
 
   let plan: PlanId | null;
   if (instance) {
-    // Wix only populates billing for paid instances, including ones in a free trial.
+    // Wix can return a paid package without a reliable `isFree` value in every
+    // app-instance response. A package name or active trial is sufficient to
+    // identify an entitled installation.
     const inTrial = instance.billing?.freeTrialInfo?.status === 'IN_PROGRESS';
-    plan = instance.isFree === false || inTrial ? planFromPackageName(instance.billing?.packageName) : null;
+    const packageName = instance.billing?.packageName;
+    plan = packageName || instance.isFree === false || inTrial
+      ? planFromPackageName(packageName)
+      : null;
+    console.info('[Post-Purchase Offers] Billing resolved', {
+      hasPackageName: Boolean(packageName),
+      isFree: instance.isFree ?? null,
+      trialStatus: instance.billing?.freeTrialInfo?.status ?? null,
+      plan,
+    });
   } else {
     const stored = (await getAppSettings()).plan;
     plan = stored in PLANS ? stored : null;

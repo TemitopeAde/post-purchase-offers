@@ -47,6 +47,7 @@ export function isCampaignEligible(campaign: Campaign, order: OrderContext): boo
 export async function generateOffersForOrder(
   orderId: string
 ): Promise<RecommendationResponse | null> {
+  console.info('[Post-Purchase Offers][Recommendations] Flow started', { orderId });
   const [order, campaigns, settings, { limits }] = await Promise.all([
     getOrderContext(orderId),
     getCampaigns(),
@@ -55,11 +56,14 @@ export async function generateOffersForOrder(
   ]);
 
   // No paid plan or trial in progress: the app is inactive on this site.
-  if (!limits) return null;
+  if (!limits) {
+    console.warn('[Post-Purchase Offers][Recommendations] Flow stopped: no active plan limits');
+    return null;
+  }
 
   // If order cannot be validated from Wix, return null to avoid unauthorized offers
   if (!order) {
-    console.warn(`Order ${orderId} could not be validated. Skipping post-purchase offers.`);
+    console.warn('[Post-Purchase Offers][Recommendations] Flow stopped: order validation failed', { orderId });
     return null;
   }
 
@@ -69,6 +73,9 @@ export async function generateOffersForOrder(
     .sort((a, b) => (b.priority || 0) - (a.priority || 0));
 
   if (eligibleCampaigns.length === 0) {
+    console.info('[Post-Purchase Offers][Recommendations] Flow stopped: no eligible campaigns', {
+      campaignCount: campaigns.length,
+    });
     return null;
   }
 
@@ -107,11 +114,29 @@ export async function generateOffersForOrder(
     defaultDeepSeekProvider.isConfigured() &&
     candidates.length > 0;
 
+  console.info('[Post-Purchase Offers][Recommendations] AI eligibility evaluated', {
+    campaignId: campaign._id ?? null,
+    recommendationMode: campaign.recommendationMode,
+    settingsAiEnabled: settings.aiEnabled,
+    providerConfigured: defaultDeepSeekProvider.isConfigured(),
+    candidateCount: candidates.length,
+    shouldTryAi,
+  });
+
   const withinAiAllowance =
     shouldTryAi && (await getMonthlyAiUsage()) < limits.monthlyAiRecommendations;
 
+  console.info('[Post-Purchase Offers][Recommendations] AI allowance evaluated', {
+    shouldTryAi,
+    withinAiAllowance,
+    monthlyLimit: limits.monthlyAiRecommendations,
+  });
+
   if (withinAiAllowance && finalOffers.length < maxOffers) {
     try {
+      console.info('[Post-Purchase Offers][Recommendations] Calling DeepSeek', {
+        remainingSlots: maxOffers - finalOffers.length,
+      });
       await recordOfferEvent({
         campaignId: campaign._id || 'unknown',
         productId: '__ai_recommendation_request__',
@@ -128,6 +153,10 @@ export async function generateOffersForOrder(
         maxRecommendations: maxOffers - finalOffers.length,
       });
 
+      console.info('[Post-Purchase Offers][Recommendations] DeepSeek result received', {
+        recommendationCount: aiResult.recommendations.length,
+      });
+
       if (aiResult.recommendations.length > 0) {
         const aiOffers = mergeAiRankingsWithOffers(
           aiResult.recommendations,
@@ -138,12 +167,18 @@ export async function generateOffersForOrder(
         source = 'ai';
       }
     } catch (err) {
-      console.warn('AI recommendation error, falling back to deterministic rules:', err);
+      console.error('[Post-Purchase Offers][Recommendations] AI recommendation failed; falling back to rules', {
+        message: err instanceof Error ? err.message : 'Unknown error',
+      });
     }
   }
 
   // 3. Fallback to deterministic rules if needed
   if (finalOffers.length === 0 && campaign.fallbackMode !== 'NONE') {
+    console.info('[Post-Purchase Offers][Recommendations] Using deterministic fallback', {
+      fallbackMode: campaign.fallbackMode,
+      candidateCount: candidates.length,
+    });
     finalOffers = rankCandidatesDeterministically(candidates, {
       orderSubtotal: order.subtotal,
       maxOffers,

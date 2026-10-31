@@ -13,6 +13,11 @@ export default defineConfig({
   devToolbar: { enabled: false },
   env: {
     schema: {
+      ENVIRONMENT: envField.string({ context: 'server', access: 'secret', optional: true }),
+      DEEPSEEK_API: envField.string({ context: 'server', access: 'secret', optional: true }),
+      DEEPSEEK_API_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
+      DEEPSEEK_MODEL: envField.string({ context: 'server', access: 'secret', optional: true }),
+      DEEPSEEK_BASE_URL: envField.string({ context: 'server', access: 'secret', optional: true }),
       LIFECYCLE_SHEETS_WEBHOOK_URL: envField.string({ context: 'server', access: 'secret', optional: true }),
       LIFECYCLE_SHEETS_WEBHOOK_SECRET: envField.string({ context: 'server', access: 'secret', optional: true }),
     },

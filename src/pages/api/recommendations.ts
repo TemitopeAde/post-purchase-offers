@@ -11,9 +11,14 @@ export const POST: APIRoute = async ({ request }) => {
       return Response.json({ error: 'orderId is required' }, { status: 400 });
     }
 
+    console.info('[Post-Purchase Offers][Recommendations API] Request received', {
+      hasOrderId: true,
+      hasSessionKey: typeof body.sessionKey === 'string' && body.sessionKey.length > 0,
+    });
     const result = await generateOffersForOrder(orderId.trim());
 
     if (!result || result.offers.length === 0) {
+      console.info('[Post-Purchase Offers][Recommendations API] No offers returned');
       return Response.json({ offers: [], message: 'No eligible post-purchase offers' }, { status: 200 });
     }
 
@@ -34,6 +39,10 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
+    console.info('[Post-Purchase Offers][Recommendations API] Response returned', {
+      offerCount: result.offers.length,
+      source: result.source,
+    });
     return Response.json(result, { status: 200 });
   } catch (err: any) {
     console.error('Error generating post-purchase recommendations:', err);
