@@ -1113,10 +1113,23 @@ export const PostPurchaseDashboard: FC = () => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                           <div>
                             <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#111827' }}>
-                              {settings?.headline || t('previewHeading')}
+                              {!settings?.headline ||
+                              settings.headline === 'A little something extra for you' ||
+                              settings.headline === 'Special Offer' ||
+                              settings.headline === 'Post-Purchase Deals' ||
+                              SUPPORTED_LOCALES.some((loc) => translate(loc, 'previewHeading') === settings.headline)
+                                ? t('previewHeading')
+                                : settings.headline}
                             </h3>
                             <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#6b7280' }}>
-                              {settings?.subheadline || t('previewSubheading')}
+                              {!settings?.subheadline ||
+                              settings.subheadline === 'Exclusive post-purchase deals selected specifically for your order.' ||
+                              settings.subheadline === 'A little something extra for you!' ||
+                              settings.subheadline === 'Complementary picks tailored to your order.' ||
+                              settings.subheadline === 'Add these complementary items to your order with one click.' ||
+                              SUPPORTED_LOCALES.some((loc) => translate(loc, 'previewSubheading') === settings.subheadline)
+                                ? t('previewSubheading')
+                                : settings.subheadline}
                             </p>
                           </div>
                           <button
@@ -1136,7 +1149,7 @@ export const PostPurchaseDashboard: FC = () => {
                               <span style={{ fontSize: '32px' }}>⚡️</span>
                             </div>
                             <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>{t('previewProduct')}</div>
-                            <div style={{ fontSize: '12px', color: '#4b5563', marginBottom: '12px' }}>{t('previewReason')}</div>
+                            <div style={{ fontSize: '12px', color: '#4b5563', marginBottom: '12px' }}>✦ {t('previewReason').replace(/^✦\s*/, '')}</div>
                             <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '12px' }}>
                               <span style={{ fontSize: '16px', fontWeight: 700 }}>
                                 {formatMoney(previewDiscountedPrice, previewCurrency, locale)}
@@ -1158,7 +1171,15 @@ export const PostPurchaseDashboard: FC = () => {
                                 cursor: 'pointer',
                               }}
                             >
-                              {previewCta}
+                              {!activeCampaign?.ctaText ||
+                              activeCampaign.ctaText === 'Claim Offer' ||
+                              activeCampaign.ctaText === 'Add to Order' ||
+                              activeCampaign.ctaText === 'Add to Order →' ||
+                              SUPPORTED_LOCALES.some(
+                                (loc) => translate(loc, 'claimOffer') === activeCampaign.ctaText || translate(loc, 'addToOrder') === activeCampaign.ctaText
+                              )
+                                ? t('claimOffer')
+                                : previewCta}
                             </button>
                           </div>
                         </div>

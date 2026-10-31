@@ -227,16 +227,38 @@ export async function generateOffersForOrder(
   }
 
   const configuredLocale = resolveLocale(settings.locale);
+  const isDefaultHeading =
+    !campaign.displayHeading &&
+    (!settings.headline ||
+      settings.headline === 'A little something extra for you' ||
+      settings.headline === 'Special Offer' ||
+      settings.headline === 'Post-Purchase Deals');
+  const isDefaultSubheading =
+    !campaign.displaySubheading &&
+    (!settings.subheadline ||
+      settings.subheadline === 'Exclusive post-purchase deals selected specifically for your order.' ||
+      settings.subheadline === 'Complementary picks tailored to your order.' ||
+      settings.subheadline === 'A little something extra for you!' ||
+      settings.subheadline === 'Add these complementary items to your order with one click.');
+  const isDefaultCta =
+    !campaign.ctaText ||
+    campaign.ctaText === 'Claim Offer' ||
+    campaign.ctaText === 'Add to Order' ||
+    campaign.ctaText === 'Add to Order →';
+
   return {
     campaign: {
       id: campaign._id || 'default',
       name: campaign.name,
-      heading: campaign.displayHeading || settings.headline || translate(configuredLocale, 'previewHeading'),
-      subheading:
-        campaign.displaySubheading ||
-        settings.subheadline ||
-        translate(configuredLocale, 'previewSubheading'),
-      ctaText: campaign.ctaText || translate(configuredLocale, 'claimOffer'),
+      heading: isDefaultHeading
+        ? translate(configuredLocale, 'previewHeading')
+        : (campaign.displayHeading || settings.headline!),
+      subheading: isDefaultSubheading
+        ? translate(configuredLocale, 'previewSubheading')
+        : (campaign.displaySubheading || settings.subheadline!),
+      ctaText: isDefaultCta
+        ? translate(configuredLocale, 'claimOffer')
+        : (campaign.ctaText || translate(configuredLocale, 'claimOffer')),
     },
     offers: campaign.recommendationMode === 'MANUAL'
       ? finalOffers

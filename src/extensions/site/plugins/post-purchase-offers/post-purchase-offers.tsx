@@ -111,15 +111,36 @@ class PostPurchaseOffersElement extends HTMLElement {
 
   private loadEditorPreview() {
     this.log('Loading editor preview data');
+    const headingAttr = this.getAttribute('heading');
+    const subheadingAttr = this.getAttribute('subheading');
+    const ctaAttr = this.getAttribute('cta-text');
+
+    const isDefaultHeading = !headingAttr ||
+      headingAttr === 'Special Offer' ||
+      headingAttr === 'Post-Purchase Deals' ||
+      headingAttr === 'A little something extra for you' ||
+      SUPPORTED_LOCALES.some((loc) => translate(loc, 'previewHeading') === headingAttr || translate(loc, 'specialOffer') === headingAttr);
+
+    const isDefaultSubheading = !subheadingAttr ||
+      subheadingAttr === 'A little something extra for you!' ||
+      subheadingAttr === 'Complementary picks tailored to your order.' ||
+      subheadingAttr === 'Exclusive post-purchase deals selected specifically for your order.' ||
+      subheadingAttr === 'Add these complementary items to your order with one click.' ||
+      SUPPORTED_LOCALES.some((loc) => translate(loc, 'previewSubheading') === subheadingAttr);
+
+    const isDefaultCta = !ctaAttr ||
+      ctaAttr === 'Claim Offer' ||
+      ctaAttr === 'Add to Order' ||
+      ctaAttr === 'Add to Order →' ||
+      SUPPORTED_LOCALES.some((loc) => translate(loc, 'claimOffer') === ctaAttr || translate(loc, 'addToOrder') === ctaAttr);
+
     this.offersData = {
       campaign: {
         id: 'preview-campaign',
         name: 'Post-Purchase Deals',
-        heading: this.getAttribute('heading') || this.t('previewHeading'),
-        subheading:
-          this.getAttribute('subheading') ||
-          this.t('previewSubheading'),
-        ctaText: this.getAttribute('cta-text') || this.t('claimOffer'),
+        heading: isDefaultHeading ? this.t('previewHeading') : headingAttr,
+        subheading: isDefaultSubheading ? this.t('previewSubheading') : subheadingAttr,
+        ctaText: isDefaultCta ? this.t('claimOffer') : ctaAttr,
       },
       offers: [
         {
@@ -561,34 +582,58 @@ class PostPurchaseOffersElement extends HTMLElement {
     });
     const isPreview = source === 'preview';
 
-    const isDefaultHeading =
-      !campaign.heading ||
-      campaign.heading === 'Special Offer' ||
-      campaign.heading === 'Post-Purchase Deals' ||
-      campaign.heading === 'A little something extra for you' ||
-      SUPPORTED_LOCALES.some((loc) => translate(loc, 'previewHeading') === campaign.heading);
-
-    const isDefaultSubheading =
-      !campaign.subheading ||
-      campaign.subheading === 'A little something extra for you!' ||
-      campaign.subheading === 'Add these complementary items to your order with one click.' ||
-      SUPPORTED_LOCALES.some((loc) => translate(loc, 'previewSubheading') === campaign.subheading);
-
-    const isDefaultCta =
-      !campaign.ctaText ||
-      campaign.ctaText === 'Add to Order' ||
-      campaign.ctaText === 'Claim Offer' ||
-      SUPPORTED_LOCALES.some(
-        (loc) => translate(loc, 'claimOffer') === campaign.ctaText || translate(loc, 'addToOrder') === campaign.ctaText
+    const isDefaultHeadingValue = (val: string | null | undefined): boolean => {
+      if (!val) return true;
+      const trimmed = val.trim();
+      return (
+        trimmed === 'Special Offer' ||
+        trimmed === 'Post-Purchase Deals' ||
+        trimmed === 'A little something extra for you' ||
+        trimmed === 'Special post-purchase deal' ||
+        SUPPORTED_LOCALES.some(
+          (loc) => translate(loc, 'previewHeading') === trimmed || translate(loc, 'specialOffer') === trimmed
+        )
       );
+    };
 
-    const heading = this.getAttribute('heading') || (isPreview || isDefaultHeading ? this.t('previewHeading') : campaign.heading);
+    const isDefaultSubheadingValue = (val: string | null | undefined): boolean => {
+      if (!val) return true;
+      const trimmed = val.trim();
+      return (
+        trimmed === 'A little something extra for you!' ||
+        trimmed === 'Complementary picks tailored to your order.' ||
+        trimmed === 'Exclusive post-purchase deals selected specifically for your order.' ||
+        trimmed === 'Add these complementary items to your order with one click.' ||
+        SUPPORTED_LOCALES.some((loc) => translate(loc, 'previewSubheading') === trimmed)
+      );
+    };
+
+    const isDefaultCtaValue = (val: string | null | undefined): boolean => {
+      if (!val) return true;
+      const trimmed = val.trim();
+      return (
+        trimmed === 'Claim Offer' ||
+        trimmed === 'Add to Order' ||
+        trimmed === 'Add to Order →' ||
+        SUPPORTED_LOCALES.some(
+          (loc) => translate(loc, 'claimOffer') === trimmed || translate(loc, 'addToOrder') === trimmed
+        )
+      );
+    };
+
+    const headingAttr = this.getAttribute('heading');
+    const heading = isDefaultHeadingValue(headingAttr)
+      ? (isDefaultHeadingValue(campaign?.heading) ? this.t('previewHeading') : campaign.heading)
+      : headingAttr!;
+
     const headingColor = this.getAttribute('heading-color') || '#111827';
     const headingFont = this.getAttribute('heading-font') || '';
 
-    const subheading =
-      this.getAttribute('subheading') ||
-      (isPreview || isDefaultSubheading ? this.t('previewSubheading') : campaign.subheading);
+    const subheadingAttr = this.getAttribute('subheading');
+    const subheading = isDefaultSubheadingValue(subheadingAttr)
+      ? (isDefaultSubheadingValue(campaign?.subheading) ? this.t('previewSubheading') : campaign.subheading)
+      : subheadingAttr!;
+
     const subheadingColor = this.getAttribute('subheading-color') || '#6b7280';
     const subheadingFont = this.getAttribute('subheading-font') || '';
 
@@ -604,7 +649,11 @@ class PostPurchaseOffersElement extends HTMLElement {
     const badgeBgColor = this.getAttribute('badge-bg-color') || '#ebf5ff';
     const badgeTextColor = this.getAttribute('badge-text-color') || '#116dff';
 
-    const ctaText = this.getAttribute('cta-text') || (isPreview || isDefaultCta ? this.t('claimOffer') : campaign.ctaText);
+    const ctaAttr = this.getAttribute('cta-text');
+    const ctaText = isDefaultCtaValue(ctaAttr)
+      ? (isDefaultCtaValue(campaign?.ctaText) ? this.t('claimOffer') : campaign.ctaText)
+      : ctaAttr!;
+
     const buttonColor = this.getAttribute('button-color') || '#116dff';
     const buttonTextColor = this.getAttribute('button-text-color') || '#ffffff';
     const buttonFont = this.getAttribute('button-font') || '';
@@ -622,38 +671,122 @@ class PostPurchaseOffersElement extends HTMLElement {
         const isOfferAdded = this.addedOfferIds.has(offerId);
         const hasDiscount = offer.regularPrice > offer.offerPrice;
 
-        const isDefaultBadge =
-          !offer.badge ||
-          offer.badge === '25% OFF' ||
-          offer.badge.includes('% OFF') ||
-          SUPPORTED_LOCALES.some(
-            (loc) =>
-              translate(loc, 'savePercent', { percent: offer.discountValue || 25 }) === offer.badge ||
-              translate(loc, 'specialOffer') === offer.badge
+        const isDefaultProductValue = (name: string): boolean => {
+          if (!name) return true;
+          const trimmed = name.trim();
+          return (
+            trimmed === 'High-Speed Fast Charger & Cable' ||
+            trimmed === 'Fast Charger & High-Speed Cable' ||
+            trimmed.includes('Fast Charger') ||
+            trimmed.includes('Schnellladegerät') ||
+            trimmed.includes('Chargeur rapide') ||
+            trimmed.includes('Cargador rápido') ||
+            trimmed.includes('Carregador rápido') ||
+            SUPPORTED_LOCALES.some((loc) => translate(loc, 'previewProduct') === trimmed)
           );
+        };
 
-        const localizedDiscountBadge = isDefaultBadge
-          ? hasDiscount
-            ? t('savePercent', {
-                percent:
-                  offer.discountValue ||
-                  Math.round(((offer.regularPrice - offer.offerPrice) / offer.regularPrice) * 100),
-              })
-            : t('specialOffer')
-          : offer.badge;
+        const productName =
+          isPreview || offer.productId === 'preview-product-1' || isDefaultProductValue(offer.productName)
+            ? t('previewProduct')
+            : offer.productName;
 
-        const isDefaultProduct =
-          isPreview ||
-          offer.productId === 'preview-product-1' ||
-          SUPPORTED_LOCALES.some((loc) => translate(loc, 'previewProduct') === offer.productName);
-        const productName = isDefaultProduct ? t('previewProduct') : offer.productName;
+        const resolveBadgeText = (rawBadge?: string): string => {
+          if (!rawBadge) {
+            return hasDiscount
+              ? t('savePercent', {
+                  percent:
+                    offer.discountValue ||
+                    Math.round(((offer.regularPrice - offer.offerPrice) / offer.regularPrice) * 100) ||
+                    25,
+                })
+              : t('specialOffer');
+          }
 
-        const isDefaultReason =
-          !offer.reason ||
-          isPreview ||
-          offer.productId === 'preview-product-1' ||
-          SUPPORTED_LOCALES.some((loc) => translate(loc, 'previewReason') === offer.reason);
-        const reasonText = isDefaultReason && isPreview ? t('previewReason') : offer.reason;
+          const trimmed = rawBadge.trim();
+          if (
+            trimmed === '25% OFF' ||
+            trimmed.endsWith('% OFF') ||
+            trimmed.startsWith('SAVE ') ||
+            trimmed.startsWith('AHORRA ') ||
+            trimmed.startsWith('POUPE ') ||
+            trimmed.startsWith('RISPARMIA ') ||
+            trimmed.startsWith('BESPAAR ') ||
+            trimmed.startsWith('OSZCZĘDŹ ') ||
+            trimmed.startsWith('SPARA ') ||
+            trimmed.startsWith('SPAR ') ||
+            trimmed.startsWith('SÄÄSTÄ ') ||
+            trimmed.startsWith('UŠETŘETE ') ||
+            trimmed.startsWith('立省') ||
+            trimmed.startsWith('وفّر') ||
+            trimmed.startsWith('חיסכון') ||
+            trimmed.startsWith('СКИДКА') ||
+            trimmed.endsWith('SPAREN') ||
+            trimmed.endsWith('off') ||
+            trimmed.endsWith('OFF') ||
+            trimmed.endsWith('할인') ||
+            trimmed.endsWith('オフ')
+          ) {
+            return t('savePercent', {
+              percent:
+                offer.discountValue ||
+                Math.round(((offer.regularPrice - offer.offerPrice) / offer.regularPrice) * 100) ||
+                25,
+            });
+          }
+          if (trimmed === 'Special Offer' || SUPPORTED_LOCALES.some((loc) => translate(loc, 'specialOffer') === trimmed)) {
+            return t('specialOffer');
+          }
+          if (trimmed === 'Frequently paired' || SUPPORTED_LOCALES.some((loc) => translate(loc, 'frequentlyPaired') === trimmed)) {
+            return t('frequentlyPaired');
+          }
+          if (trimmed === 'Top Recommendation' || SUPPORTED_LOCALES.some((loc) => translate(loc, 'topRecommendation') === trimmed)) {
+            return t('topRecommendation');
+          }
+          if (trimmed === 'Recommended for you' || SUPPORTED_LOCALES.some((loc) => translate(loc, 'recommendedForYou') === trimmed)) {
+            return t('recommendedForYou');
+          }
+          if (trimmed === 'Selected by you' || SUPPORTED_LOCALES.some((loc) => translate(loc, 'selectedByYou') === trimmed)) {
+            return t('selectedByYou');
+          }
+          return rawBadge;
+        };
+
+        const localizedDiscountBadge = resolveBadgeText(offer.badge);
+
+        const resolveReasonText = (rawReason?: string): string | null => {
+          if (!rawReason) return null;
+          const trimmed = rawReason.replace(/^✦\s*/, '').trim();
+          if (
+            trimmed.includes('charging accessory') ||
+            trimmed.includes('Ladezubehör') ||
+            trimmed.includes('Accessoire de charge') ||
+            trimmed.includes('Accesorio de carga') ||
+            trimmed.includes('Acessório de carregamento') ||
+            trimmed.includes('Accessorio ideale') ||
+            SUPPORTED_LOCALES.some((loc) => translate(loc, 'previewReason').replace(/^✦\s*/, '').trim() === trimmed)
+          ) {
+            return t('previewReason').replace(/^✦\s*/, '').trim();
+          }
+          if (
+            trimmed === 'Popular add-on chosen for orders like yours.' ||
+            SUPPORTED_LOCALES.some((loc) => translate(loc, 'popularAddonReason') === trimmed)
+          ) {
+            return t('popularAddonReason');
+          }
+          if (
+            trimmed === 'Selected manually by the merchant.' ||
+            SUPPORTED_LOCALES.some((loc) => translate(loc, 'merchantSelectedReason') === trimmed)
+          ) {
+            return t('merchantSelectedReason');
+          }
+          return trimmed;
+        };
+
+        const reasonText =
+          isPreview || offer.productId === 'preview-product-1'
+            ? t('previewReason').replace(/^✦\s*/, '').trim()
+            : resolveReasonText(offer.reason);
 
         return `
           <div class="ppo-card" data-index="${idx}" style="background: ${cardBgColor}; border: 1px solid #e5e7eb; border-radius: ${borderRadius}px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 6px rgba(0,0,0,0.04); position: relative; transition: transform 0.15s ease, box-shadow 0.15s ease;">
