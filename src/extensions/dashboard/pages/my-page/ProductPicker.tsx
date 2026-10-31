@@ -66,6 +66,7 @@ export const ProductPicker: FC<ProductPickerProps> = ({
         onChange={(e) => onSearchChange(e.target.value)}
         onClear={() => onSearchChange('')}
         placeholder={t('searchProducts')}
+        aria-label={t('searchProducts')}
       />
 
       {selected.length > 0 && (
@@ -122,7 +123,7 @@ export const ProductPicker: FC<ProductPickerProps> = ({
             >
               {/* The whole row toggles; keep the checkbox's own clicks from toggling twice. */}
               <Box onClick={(e: { stopPropagation: () => void }) => e.stopPropagation()}>
-                <Checkbox checked={isSelected} onChange={() => toggle(product)} />
+                <Checkbox checked={isSelected} onChange={() => toggle(product)} aria-label={product.name} />
               </Box>
               {product.imageUrl ? (
                 <Image src={product.imageUrl} width={40} height={40} fit="cover" borderRadius="4px" />

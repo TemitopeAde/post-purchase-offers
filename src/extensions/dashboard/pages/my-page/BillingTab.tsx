@@ -24,9 +24,9 @@ const Box = WdsBox as any;
 const PLAN_ORDER: PlanId[] = ['Pro', 'Business'];
 
 // Each row renders a value per plan: a string, or a boolean shown as a check or a lock.
-const COMPARISON: { title: Parameters<typeof translate>[1]; value: (plan: PlanDefinition) => string | boolean }[] = [
-  { title: 'activeCampaigns', value: (p) => p.limits.maxActiveCampaigns?.toLocaleString() ?? 'unlimited' },
-  { title: 'aiRecommendations', value: (p) => p.limits.monthlyAiRecommendations.toLocaleString() },
+const COMPARISON: { title: Parameters<typeof translate>[1]; value: (plan: PlanDefinition, locale: Locale) => string | boolean }[] = [
+  { title: 'activeCampaigns', value: (p, loc) => p.limits.maxActiveCampaigns?.toLocaleString(loc) ?? 'unlimited' },
+  { title: 'aiRecommendations', value: (p, loc) => p.limits.monthlyAiRecommendations.toLocaleString(loc) },
   { title: 'smartProductRanking', value: () => true },
   { title: 'targetingByProduct', value: (p) => p.limits.advancedTargeting },
   { title: 'stackedTargeting', value: (p) => p.limits.stackedRules },
@@ -37,10 +37,21 @@ const COMPARISON: { title: Parameters<typeof translate>[1]; value: (plan: PlanDe
 
 const USAGE_WARNING_PERCENT = 80;
 
-const formatDate = (iso?: string | null) =>
-  iso ? new Date(iso).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) : undefined;
+const formatDate = (iso?: string | null, locale?: Locale) =>
+  iso ? new Date(iso).toLocaleDateString(locale, { month: 'long', day: 'numeric', year: 'numeric' }) : undefined;
 
-const formatPrice = (amount: number) => `$${amount % 1 === 0 ? amount : amount.toFixed(2)}`;
+const formatPrice = (amount: number, locale: Locale = 'en') => {
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `$${amount % 1 === 0 ? amount : amount.toFixed(2)}`;
+  }
+};
 
 const percentOf = (used: number, limit: number) => (limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0);
 
@@ -52,9 +63,13 @@ function planBadge(billing: BillingStatus, t: (key: Parameters<typeof translate>
   return <Badge skin="success">{t('active')}</Badge>;
 }
 
-function renewalText(billing: BillingStatus, t: (key: Parameters<typeof translate>[1], values?: Record<string, string | number>) => string): string {
+function renewalText(
+  billing: BillingStatus,
+  t: (key: Parameters<typeof translate>[1], values?: Record<string, string | number>) => string,
+  locale: Locale,
+): string {
   if (billing.isDevelopment) return t('allPlanFeatures');
-  const date = formatDate(billing.expirationDate);
+  const date = formatDate(billing.expirationDate, locale);
   if (!date) return t('planActive');
   return billing.autoRenewing === false ? t('planEndsRenewalOff', { date }) : t('planRenews', { date });
 }
@@ -66,12 +81,19 @@ const ComparisonValue: FC<{ value: string | boolean }> = ({ value }) =>
     <Text skin={value ? 'success' : 'disabled'}>{value ? <Check /> : <LockLocked />}</Text>
   );
 
-const UsageMeter: FC<{ label: string; used: number; limit: number | null; unit: string }> = ({ label, used, limit, unit }) => {
+const UsageMeter: FC<{
+  label: string;
+  used: number;
+  limit: number | null;
+  unit: string;
+  locale: Locale;
+  t: (key: Parameters<typeof translate>[1], values?: Record<string, string | number>) => string;
+}> = ({ label, used, limit, unit, locale, t }) => {
   if (limit === null) {
     return (
       <Box direction="vertical" gap="SP1">
         <Text weight="bold">{label}</Text>
-        <Text size="small" secondary>{used.toLocaleString()} {unit} · Unlimited</Text>
+        <Text size="small" secondary>{t('usedUnlimited', { used: used.toLocaleString(locale), unit })}</Text>
       </Box>
     );
   }
@@ -79,12 +101,12 @@ const UsageMeter: FC<{ label: string; used: number; limit: number | null; unit: 
   return (
     <Box direction="vertical" gap="SP2">
       <Text weight="bold">{label}</Text>
-      <Text size="small" secondary>{used.toLocaleString()} of {limit.toLocaleString()} {unit}</Text>
+      <Text size="small" secondary>{t('usedOfLimit', { used: used.toLocaleString(locale), limit: limit.toLocaleString(locale), unit })}</Text>
       <LinearProgressBar
         value={percent}
         showProgressIndication
         skin={percent >= USAGE_WARNING_PERCENT ? 'warning' : 'standard'}
-        aria-label={`${label} used`}
+        aria-label={t('usedProgressAria', { label })}
       />
     </Box>
   );
@@ -107,7 +129,7 @@ export const BillingTab: FC<{ billing: BillingStatus | null; locale: Locale }> =
 
   const openPricing = () => billing.upgradeUrl && window.open(billing.upgradeUrl, '_blank', 'noopener');
   const current = billing.plan ? PLANS[billing.plan] : billing.isDevelopment ? PLANS.Business : null;
-  const trialEnds = billing.freeTrial?.status === 'IN_PROGRESS' ? formatDate(billing.freeTrial.endDate) : undefined;
+  const trialEnds = billing.freeTrial?.status === 'IN_PROGRESS' ? formatDate(billing.freeTrial.endDate, locale) : undefined;
   const aiPercent = billing.limits ? percentOf(billing.monthlyUsage, billing.limits.monthlyAiRecommendations) : 0;
 
   return (
@@ -138,7 +160,7 @@ export const BillingTab: FC<{ billing: BillingStatus | null; locale: Locale }> =
       {trialEnds && (
         <SectionHelper
           skin="premium"
-          title={`Your free trial ends on ${trialEnds}`}
+          title={t('planEnds', { date: trialEnds })}
           actionText={billing.upgradeUrl ? t('managePlan') : undefined}
           onAction={billing.upgradeUrl ? openPricing : undefined}
         >
@@ -149,11 +171,11 @@ export const BillingTab: FC<{ billing: BillingStatus | null; locale: Locale }> =
       {current && billing.limits && aiPercent >= USAGE_WARNING_PERCENT && (
         <SectionHelper
           skin="warning"
-          title={`You've used ${aiPercent}% of this month's AI recommendations`}
-          actionText={billing.plan === 'Pro' && billing.upgradeUrl ? 'Upgrade to Business' : undefined}
+          title={t('usedMonthlyRecommendations', { percent: aiPercent })}
+          actionText={billing.plan === 'Pro' && billing.upgradeUrl ? t('upgradeBusiness') : undefined}
           onAction={billing.plan === 'Pro' && billing.upgradeUrl ? openPricing : undefined}
         >
-          When the allowance runs out, offers keep showing using smart product ranking until next month.
+          {t('allowanceExceededFallback')}
         </SectionHelper>
       )}
 
@@ -170,11 +192,11 @@ export const BillingTab: FC<{ billing: BillingStatus | null; locale: Locale }> =
                     {billing.billingCycle && (
                       <Text size="small" secondary>
                         {t(billing.billingCycle === 'MONTHLY' ? 'billedMonthly' : billing.billingCycle === 'YEARLY' ? 'billedYearly' : billing.billingCycle === 'TWO_YEARS' ? 'billedTwoYears' : billing.billingCycle === 'THREE_YEARS' ? 'billedThreeYears' : 'oneTimePurchase')} ·{' '}
-                        {formatPrice(billing.billingCycle === 'YEARLY' ? current.yearlyMonthlyPrice : current.monthlyPrice)}/{t('month')}
+                        {formatPrice(billing.billingCycle === 'YEARLY' ? current.yearlyMonthlyPrice : current.monthlyPrice, locale)}/{t('month')}
                       </Text>
                     )}
                   </Box>
-                  <Text>{renewalText(billing, t)}</Text>
+                  <Text>{renewalText(billing, t, locale)}</Text>
                   <Box>
                     <Button priority="secondary" suffixIcon={<ExternalLink />} disabled={!billing.upgradeUrl} onClick={openPricing}>
                       {t('managePlan')}
@@ -196,12 +218,16 @@ export const BillingTab: FC<{ billing: BillingStatus | null; locale: Locale }> =
                     used={billing.monthlyUsage}
                     limit={billing.limits.monthlyAiRecommendations}
                     unit={t('requests')}
+                    locale={locale}
+                    t={t}
                   />
                   <UsageMeter
                     label={t('activeCampaigns')}
                     used={billing.activeCampaigns}
                     limit={billing.limits.maxActiveCampaigns}
                     unit={t('campaignsUnit')}
+                    locale={locale}
+                    t={t}
                   />
                 </Box>
               </Card.Content>
@@ -226,9 +252,9 @@ export const BillingTab: FC<{ billing: BillingStatus | null; locale: Locale }> =
                 <Card.Content>
                   <Box direction="vertical" gap="SP4">
                     <Box direction="vertical" gap="SP1">
-                      <Heading size="large">{formatPrice(plan.monthlyPrice)}/month</Heading>
+                      <Heading size="large">{formatPrice(plan.monthlyPrice, locale)}/{t('month')}</Heading>
                       <Text size="small" secondary>
-                        or {formatPrice(plan.yearlyMonthlyPrice)}/month billed yearly · {plan.trialDays}-day free trial
+                        {t('orBilledYearly', { price: formatPrice(plan.yearlyMonthlyPrice, locale), days: plan.trialDays })}
                       </Text>
                     </Box>
                     <Box direction="vertical" gap="SP3">
@@ -237,15 +263,15 @@ export const BillingTab: FC<{ billing: BillingStatus | null; locale: Locale }> =
                           {index > 0 && <Divider />}
                           <Box gap="SP3" verticalAlign="middle">
                             <Box flexGrow={1}>
-                              <Text size="small" skin={row.value(plan) === false ? 'disabled' : 'standard'}>{t(row.title)}</Text>
+                              <Text size="small" skin={row.value(plan, locale) === false ? 'disabled' : 'standard'}>{t(row.title)}</Text>
                             </Box>
                             <ComparisonValue value={(() => {
-                              const value = row.value(plan);
+                              const value = row.value(plan, locale);
                               if (value === 'unlimited') return t('unlimited');
                               if (value === 'allHistory') return t('allHistory');
                               if (value === 'priority') return t('priority');
                               if (value === 'email') return t('email');
-                              if (typeof value === 'string' && value.startsWith('days:')) return `${value.slice(5)} ${t('days')}`;
+                              if (typeof value === 'string' && value.startsWith('days:')) return `${Number(value.slice(5)).toLocaleString(locale)} ${t('days')}`;
                               return value;
                             })()} />
                           </Box>

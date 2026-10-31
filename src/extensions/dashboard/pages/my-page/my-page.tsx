@@ -64,6 +64,7 @@ export const PostPurchaseDashboard: FC = () => {
   const [newCampaignDiscount, setNewCampaignDiscount] = useState('15');
   const [newCampaignMode, setNewCampaignMode] = useState<CampaignFormValues['mode']>('AI');
   const [newCampaignMinSubtotal, setNewCampaignMinSubtotal] = useState('0');
+  const [newCampaignPriority, setNewCampaignPriority] = useState('5');
   const [manualProducts, setManualProducts] = useState<ProductCandidate[]>([]);
   // Full products, not just ids, so selections stay visible when a new search replaces the list.
   const [selectedManualProducts, setSelectedManualProducts] = useState<ProductCandidate[]>([]);
@@ -82,6 +83,7 @@ export const PostPurchaseDashboard: FC = () => {
     setNewCampaignName('');
     setNewCampaignDiscount('15');
     setNewCampaignMinSubtotal('0');
+    setNewCampaignPriority('5');
     setNewCampaignMode(canUseAiRecommendations ? 'AI' : 'RULES');
     setSelectedManualProducts([]);
     setManualProductSearch('');
@@ -108,6 +110,7 @@ export const PostPurchaseDashboard: FC = () => {
     setNewCampaignName(campaign.name);
     setNewCampaignDiscount(String(campaign.discountValue ?? 0));
     setNewCampaignMinSubtotal(String(campaign.minOrderSubtotal ?? 0));
+    setNewCampaignPriority(String(campaign.priority ?? 1));
     setNewCampaignMode(
       campaign.recommendationMode === 'AI' && !canUseAiRecommendations
         ? 'RULES'
@@ -312,6 +315,7 @@ export const PostPurchaseDashboard: FC = () => {
       name: newCampaignName,
       discount: newCampaignDiscount,
       minSubtotal: newCampaignMinSubtotal,
+      priority: newCampaignPriority,
       mode: newCampaignMode,
     });
 
@@ -335,7 +339,7 @@ export const PostPurchaseDashboard: FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: parsed.data.name,
-          ...(isEditing ? {} : { status: 'active', priority: 5 }),
+          ...(isEditing ? { priority: parsed.data.priority } : { status: 'active', priority: parsed.data.priority }),
           minOrderSubtotal: parsed.data.minSubtotal,
           recommendationMode: parsed.data.mode,
           maxOffers: parsed.data.mode === 'MANUAL'
@@ -670,6 +674,7 @@ export const PostPurchaseDashboard: FC = () => {
                             <th style={{ padding: '12px 8px' }}>{t('mode')}</th>
                             <th style={{ padding: '12px 8px' }}>{t('discount')}</th>
                             <th style={{ padding: '12px 8px' }}>{t('minimumOrder')}</th>
+                            <th style={{ padding: '12px 8px' }}>{t('campaignPriority')}</th>
                             <th style={{ padding: '12px 8px' }}>{t('status')}</th>
                             <th style={{ padding: '12px 8px', textAlign: 'right' }}>{t('actions')}</th>
                           </tr>
@@ -698,6 +703,7 @@ export const PostPurchaseDashboard: FC = () => {
                                   ? formatMoney(camp.minOrderSubtotal, camp.currency || overviewMetrics?.currency, locale)
                                   : t('noMinimum')}
                               </td>
+                            <td style={{ padding: '12px 8px' }}>{camp.priority ?? 1}</td>
                               <td style={{ padding: '12px 8px' }}>
                                 <Badge skin={camp.status === 'active' ? 'success' : 'warning'}>
                                   {camp.status.toUpperCase()}
@@ -813,6 +819,18 @@ export const PostPurchaseDashboard: FC = () => {
                         )}
 
                         <Box gap="SP3">
+                          <Box direction="vertical" style={{ flex: 1 }}>
+                            <FormField label={t('campaignPriority')}>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={1000}
+                                value={newCampaignPriority}
+                                onChange={(e) => setNewCampaignPriority(e.target.value)}
+                                aria-label={t('campaignPriority')}
+                              />
+                            </FormField>
+                          </Box>
                           <Box direction="vertical" style={{ flex: 1 }}>
                             <FormField label={t('discountPercentage')}>
                               <Input

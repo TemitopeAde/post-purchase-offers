@@ -44,6 +44,7 @@ export const PATCH: APIRoute = async ({ params, request }) => {
       name: updates.name ?? existing.name,
       discount: updates.discountValue ?? existing.discountValue,
       minSubtotal: updates.minOrderSubtotal ?? existing.minOrderSubtotal ?? 0,
+      priority: updates.priority ?? existing.priority ?? 1,
       mode: updates.recommendationMode ?? existing.recommendationMode,
     });
     if (!parsed.success) {
@@ -60,6 +61,7 @@ export const PATCH: APIRoute = async ({ params, request }) => {
       ...campaignUpdates,
       name: parsed.data.name,
       discountValue: parsed.data.discount,
+      priority: parsed.data.priority,
       minOrderSubtotal: parsed.data.minSubtotal,
       recommendationMode: parsed.data.mode,
     });

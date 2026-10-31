@@ -26,6 +26,7 @@ export const POST: APIRoute = async ({ request }) => {
       name: body.name,
       discount: body.discountValue,
       minSubtotal: body.minOrderSubtotal,
+      priority: body.priority ?? 1,
       mode: body.recommendationMode,
     });
 
@@ -42,7 +43,7 @@ export const POST: APIRoute = async ({ request }) => {
       name: parsed.data.name,
       description: body.description || '',
       status: body.status || 'draft',
-      priority: Number(body.priority || 1),
+      priority: parsed.data.priority,
       startAt: body.startAt,
       endAt: body.endAt,
       triggerProductIds: body.triggerProductIds || [],
