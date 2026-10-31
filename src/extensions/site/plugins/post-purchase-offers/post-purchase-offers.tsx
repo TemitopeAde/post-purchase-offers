@@ -2,6 +2,7 @@ import { window as wixWindow } from '@wix/site-window';
 import { currentCartV2 } from '@wix/ecom';
 import { ecom } from '@wix/site-ecom';
 import { httpClient } from '@wix/essentials';
+import { detectLocale, translate, type Locale } from '../../../../lib/i18n';
 
 const fetchWithAuth = httpClient.fetchWithAuth || fetch;
 
@@ -44,6 +45,7 @@ class PostPurchaseOffersElement extends HTMLElement {
   private isLoading = false;
   private isDismissed = false;
   private processingOfferId: string | null = null;
+  private processingAction: 'cart' | 'checkout' | null = null;
   private addedOfferIds = new Set<string>();
   private variantPicker: {
     offer: any;
@@ -55,6 +57,7 @@ class PostPurchaseOffersElement extends HTMLElement {
   private hasFetched = false;
   private isInitializing = false;
   private escapeHandler: ((event: KeyboardEvent) => void) | null = null;
+  private locale: Locale = detectLocale();
 
   constructor() {
     super();
@@ -76,6 +79,10 @@ class PostPurchaseOffersElement extends HTMLElement {
     console.info(`[PostPurchaseOffers] ${message}${suffix}`);
   }
 
+  private t(key: Parameters<typeof translate>[1], values?: Record<string, string | number>): string {
+    return translate(this.locale, key, values);
+  }
+
   private async isEditorMode(): Promise<boolean> {
     try {
       const mode = await wixWindow.viewMode();
@@ -94,17 +101,17 @@ class PostPurchaseOffersElement extends HTMLElement {
       campaign: {
         id: 'preview-campaign',
         name: 'Post-Purchase Deals',
-        heading: this.getAttribute('heading') || 'A little something extra for you',
+        heading: this.getAttribute('heading') || this.t('previewHeading'),
         subheading:
           this.getAttribute('subheading') ||
-          'Special offer selected exclusively for your recent order.',
-        ctaText: this.getAttribute('cta-text') || 'Claim Offer',
+          this.t('previewSubheading'),
+        ctaText: this.getAttribute('cta-text') || this.t('claimOffer'),
       },
       offers: [
         {
           _id: 'preview-offer-1',
           productId: 'preview-product-1',
-          productName: 'Fast Charging Power Adapter & Braided Cable',
+          productName: this.t('previewProduct'),
           productImageUrl:
             'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=400&q=80',
           regularPrice: 29.99,
@@ -112,7 +119,7 @@ class PostPurchaseOffersElement extends HTMLElement {
           discountType: 'PERCENTAGE',
           discountValue: 25,
           badge: '25% OFF',
-          reason: 'High-speed charger matches perfectly with your recent purchase.',
+          reason: this.t('previewReason'),
         },
       ],
       source: 'preview',
@@ -158,6 +165,7 @@ class PostPurchaseOffersElement extends HTMLElement {
   }
 
   private async init() {
+    this.locale = detectLocale();
     const isEditor = await this.isEditorMode();
     // Read the prop after the async view-mode check because Wix may attach
     // order-id after connectedCallback has already fired.
@@ -279,6 +287,7 @@ class PostPurchaseOffersElement extends HTMLElement {
     if (!selection) return;
 
     this.processingOfferId = offerId;
+    this.processingAction = 'checkout';
     this.render();
 
     const orderId = this.getAttribute('order-id');
@@ -304,7 +313,7 @@ class PostPurchaseOffersElement extends HTMLElement {
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        throw new Error(err?.error || 'Checkout initiation failed');
+        throw new Error(err?.error || this.t('unableCheckout'));
       }
 
       const data = await response.json();
@@ -314,11 +323,12 @@ class PostPurchaseOffersElement extends HTMLElement {
         window.location.href = data.checkoutUrl;
         return;
       }
-      throw new Error('No checkout URL returned');
+      throw new Error(this.t('unableCheckout'));
     } catch (err: any) {
       console.error(`[PostPurchaseOffers] Checkout request failed ${this.formatLogDetails(err)}`);
-      alert(err.message || 'Unable to add offer to checkout. Please try again.');
+      alert(err.message || this.t('unableCheckout'));
       this.processingOfferId = null;
+      this.processingAction = null;
       this.render();
     }
   }
@@ -338,6 +348,7 @@ class PostPurchaseOffersElement extends HTMLElement {
     if (!selection) return;
 
     this.processingOfferId = offerId;
+    this.processingAction = 'cart';
     this.render();
 
     try {
@@ -360,9 +371,10 @@ class PostPurchaseOffersElement extends HTMLElement {
       this.log('Offer added to current cart', { offerId });
     } catch (err: any) {
       console.error(`[PostPurchaseOffers] Add to cart failed ${this.formatLogDetails(err)}`);
-      alert(err?.message || 'Unable to add this item to your cart. Please try again.');
+      alert(err?.message || this.t('unableCart'));
     } finally {
       this.processingOfferId = null;
+      this.processingAction = null;
       this.render();
     }
   }
@@ -372,13 +384,13 @@ class PostPurchaseOffersElement extends HTMLElement {
       const response = await fetchWithAuth(
         apiUrl(`/api/product-variants?productId=${encodeURIComponent(String(offer.productId))}`),
       );
-      if (!response.ok) throw new Error('Could not load product options');
+      if (!response.ok) throw new Error(this.t('unableOptions'));
       const data = await response.json();
       const variants = Array.isArray(data?.variants) ? data.variants : [];
       const options = Array.isArray(data?.options) ? data.options : [];
 
       if (variants.length === 0) {
-        throw new Error('No purchasable variant is available for this product');
+        throw new Error(this.t('unavailableCombination'));
       }
       if (options.length === 0) {
         return { variantId: offer.variantId || variants[0].variantId };
@@ -396,7 +408,7 @@ class PostPurchaseOffersElement extends HTMLElement {
       });
     } catch (err: any) {
       console.error(`[PostPurchaseOffers] Variant lookup failed ${this.formatLogDetails(err)}`);
-      alert(err?.message || 'Unable to load this product’s options. Please try again.');
+      alert(err?.message || this.t('unableOptions'));
       return null;
     }
   }
@@ -415,7 +427,7 @@ class PostPurchaseOffersElement extends HTMLElement {
 
     const hasAllChoices = picker.options.every((option) => Boolean(picker.selectedChoices[option.name]));
     if (!hasAllChoices) {
-      alert('Please select an option for this product.');
+      alert(this.t('selectOption'));
       return;
     }
 
@@ -423,7 +435,7 @@ class PostPurchaseOffersElement extends HTMLElement {
       picker.options.every((option) => variant.choices[option.name] === picker.selectedChoices[option.name]),
     );
     if (!selectedVariant) {
-      alert('That combination is unavailable. Please choose another option.');
+      alert(this.t('unavailableCombination'));
       return;
     }
 
@@ -446,6 +458,7 @@ class PostPurchaseOffersElement extends HTMLElement {
   }
 
   render() {
+    const t = (key: Parameters<typeof translate>[1], values?: Record<string, string | number>) => translate(this.locale, key, values);
     this.removeEscapeHandler();
 
     if (this.isDismissed) {
@@ -459,7 +472,7 @@ class PostPurchaseOffersElement extends HTMLElement {
       this.innerHTML = `
         <div style="font-family: Arial, sans-serif; text-align: center; padding: 24px; color: #666;">
           <div style="display: inline-block; width: 24px; height: 24px; border: 2px solid #ddd; border-top-color: #3899ec; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
-          <p style="margin-top: 8px; font-size: 14px;">Finding exclusive deals for your order...</p>
+          <p style="margin-top: 8px; font-size: 14px;">${t('findingDeals')}</p>
         </div>
         <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
       `;
@@ -480,14 +493,14 @@ class PostPurchaseOffersElement extends HTMLElement {
       offerCount: offers.length,
       source,
     });
-    const heading = this.getAttribute('heading') || campaign.heading || 'A little something extra for you';
+    const heading = this.getAttribute('heading') || campaign.heading || this.t('previewHeading');
     const headingColor = this.getAttribute('heading-color') || '#111827';
     const headingFont = this.getAttribute('heading-font') || '';
 
     const subheading =
       this.getAttribute('subheading') ||
       campaign.subheading ||
-      'Complementary picks tailored to your recent order.';
+      this.t('previewSubheading');
     const subheadingColor = this.getAttribute('subheading-color') || '#6b7280';
     const subheadingFont = this.getAttribute('subheading-font') || '';
 
@@ -503,7 +516,7 @@ class PostPurchaseOffersElement extends HTMLElement {
     const badgeBgColor = this.getAttribute('badge-bg-color') || '#ebf5ff';
     const badgeTextColor = this.getAttribute('badge-text-color') || '#116dff';
 
-    const ctaText = this.getAttribute('cta-text') || campaign.ctaText || 'Claim Offer';
+    const ctaText = this.getAttribute('cta-text') || campaign.ctaText || this.t('claimOffer');
     const buttonColor = this.getAttribute('button-color') || '#116dff';
     const buttonTextColor = this.getAttribute('button-text-color') || '#ffffff';
     const buttonFont = this.getAttribute('button-font') || '';
@@ -516,20 +529,20 @@ class PostPurchaseOffersElement extends HTMLElement {
       .map((offer: any, idx: number) => {
         const offerId = this.getOfferKey(offer);
         const isOfferProcessing = this.processingOfferId === offerId;
+        const isCartProcessing = isOfferProcessing && this.processingAction === 'cart';
+        const isCheckoutProcessing = isOfferProcessing && this.processingAction === 'checkout';
         const isOfferAdded = this.addedOfferIds.has(offerId);
         const hasDiscount = offer.regularPrice > offer.offerPrice;
-        const discountBadge =
-          offer.badge ||
-          (hasDiscount
-            ? `SAVE ${Math.round(((offer.regularPrice - offer.offerPrice) / offer.regularPrice) * 100)}%`
-            : 'Special Offer');
+        const localizedDiscountBadge = offer.badge || (hasDiscount
+          ? t('savePercent', { percent: Math.round(((offer.regularPrice - offer.offerPrice) / offer.regularPrice) * 100) })
+          : t('specialOffer'));
 
         return `
           <div class="ppo-card" data-index="${idx}" style="background: ${cardBgColor}; border: 1px solid #e5e7eb; border-radius: ${borderRadius}px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 6px rgba(0,0,0,0.04); position: relative; transition: transform 0.15s ease, box-shadow 0.15s ease;">
             <div>
               ${
-                discountBadge
-                  ? `<span style="position: absolute; top: 12px; right: 12px; background: ${badgeBgColor}; color: ${badgeTextColor}; font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;">${discountBadge}</span>`
+                localizedDiscountBadge
+                  ? `<span style="position: absolute; top: 12px; right: 12px; background: ${badgeBgColor}; color: ${badgeTextColor}; font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;">${localizedDiscountBadge}</span>`
                   : ''
               }
               <div style="width: 100%; height: 160px; display: flex; align-items: center; justify-content: center; background: #f9fafb; border-radius: ${Math.max(
@@ -574,7 +587,11 @@ class PostPurchaseOffersElement extends HTMLElement {
                 isOfferProcessing || isOfferAdded ? 'disabled' : ''
               }>
                 ${
-                  isOfferAdded ? 'Added to Cart ✓' : isOfferProcessing ? 'Adding to Cart...' : 'Add to Cart'
+                  isOfferAdded
+                    ? t('addedToCart')
+                    : isCartProcessing
+                      ? `<span aria-label="${t('loading')}" style="display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(17,24,39,0.25); border-top-color: currentColor; border-radius: 50%; animation: spin 0.8s linear infinite;"></span>`
+                      : t('addToCart')
                 }
               </button>
               <button class="ppo-claim-btn" data-index="${idx}" style="width: 100%; background: ${buttonColor}; color: ${buttonTextColor}; ${buttonFont ? `font: ${buttonFont};` : 'font-size: 14px; font-weight: 600;'} border: none; border-radius: ${Math.max(
@@ -583,7 +600,9 @@ class PostPurchaseOffersElement extends HTMLElement {
               )}px; padding: 10px 16px; cursor: pointer; transition: opacity 0.15s ease; display: flex; align-items: center; justify-content: center; gap: 6px;" ${
                 isOfferProcessing ? 'disabled' : ''
               }>
-                ${isOfferProcessing ? 'Redirecting to Checkout...' : `${ctaText} →`}
+                ${isCheckoutProcessing
+                  ? `<span aria-label="${t('loading')}" style="display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite;"></span>`
+                  : `${ctaText} →`}
               </button>
               </div>
             </div>
@@ -596,20 +615,20 @@ class PostPurchaseOffersElement extends HTMLElement {
       ? `
         <div class="ppo-variant-backdrop" style="position: fixed; inset: 0; z-index: 2147483648; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(17, 24, 39, 0.62);">
           <div class="ppo-variant-dialog" role="dialog" aria-modal="true" aria-labelledby="ppo-variant-heading" style="width: min(420px, 100%); background: #fff; border-radius: ${borderRadius}px; padding: 22px; box-shadow: 0 24px 80px rgba(0,0,0,0.24); font-family: Arial, sans-serif;">
-            <h3 id="ppo-variant-heading" style="margin: 0 0 6px; color: ${headingColor}; font-size: 18px;">Choose options</h3>
+            <h3 id="ppo-variant-heading" style="margin: 0 0 6px; color: ${headingColor}; font-size: 18px;">${t('chooseOptions')}</h3>
             <p style="margin: 0 0 18px; color: #6b7280; font-size: 13px;">${this.escapeHtml(this.variantPicker.offer.productName)}</p>
             ${this.variantPicker.options.map((option) => `
               <label style="display: block; margin-bottom: 14px; color: ${productTitleColor}; font-size: 13px; font-weight: 600;">
                 ${this.escapeHtml(option.name)}
                 <select class="ppo-variant-select" data-option-name="${this.escapeHtml(option.name)}" style="display: block; width: 100%; margin-top: 6px; padding: 9px; border: 1px solid #d1d5db; border-radius: 4px; background: #fff; color: #111827;">
-                  <option value="">Choose ${this.escapeHtml(option.name)}</option>
+                  <option value="">${this.escapeHtml(t('chooseOption', { option: option.name }))}</option>
                   ${option.choices.map((choice) => `<option value="${this.escapeHtml(choice)}" ${this.variantPicker?.selectedChoices[option.name] === choice ? 'selected' : ''}>${this.escapeHtml(choice)}</option>`).join('')}
                 </select>
               </label>
             `).join('')}
             <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px;">
-              <button class="ppo-variant-cancel" style="background: transparent; border: 1px solid #d1d5db; color: #374151; border-radius: 4px; padding: 9px 14px; cursor: pointer;">Cancel</button>
-              <button class="ppo-variant-confirm" style="background: ${buttonColor}; color: ${buttonTextColor}; border: none; border-radius: 4px; padding: 9px 14px; cursor: pointer;">Continue</button>
+              <button class="ppo-variant-cancel" style="background: transparent; border: 1px solid #d1d5db; color: #374151; border-radius: 4px; padding: 9px 14px; cursor: pointer;">${t('cancel')}</button>
+              <button class="ppo-variant-confirm" style="background: ${buttonColor}; color: ${buttonTextColor}; border: none; border-radius: 4px; padding: 9px 14px; cursor: pointer;">${t('continue')}</button>
             </div>
           </div>
         </div>
@@ -627,13 +646,13 @@ class PostPurchaseOffersElement extends HTMLElement {
               </div>
               <p style="${subheadingFont ? `font: ${subheadingFont};` : 'font-size: 13px;'} color: ${subheadingColor}; margin: 0;">${subheading}</p>
             </div>
-            <button class="ppo-dismiss-btn" aria-label="Dismiss offer" style="flex: 0 0 auto; background: transparent; border: none; color: #6b7280; font-size: 24px; line-height: 1; cursor: pointer; padding: 2px 4px;">&times;</button>
+            <button class="ppo-dismiss-btn" aria-label="${t('dismissOffer')}" style="flex: 0 0 auto; background: transparent; border: none; color: #6b7280; font-size: 24px; line-height: 1; cursor: pointer; padding: 2px 4px;">&times;</button>
           </div>
 
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
             ${cardsHtml}
           </div>
-          <button class="ppo-dismiss-link" style="display: block; margin: 18px auto 0; background: transparent; border: none; color: #6b7280; font-size: 12px; cursor: pointer; padding: 4px 8px; text-decoration: underline;">No thanks, dismiss</button>
+          <button class="ppo-dismiss-link" style="display: block; margin: 18px auto 0; background: transparent; border: none; color: #6b7280; font-size: 12px; cursor: pointer; padding: 4px 8px; text-decoration: underline;">${t('noThanks')}</button>
         </div>
       </div>
       ${variantPickerHtml}

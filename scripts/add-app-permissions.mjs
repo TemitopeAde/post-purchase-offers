@@ -34,6 +34,8 @@ const PERMISSIONS = [
   'SCOPE.DC-STORES.READ-PRODUCTS',
   // @wix/stores productsV3.getProduct (Catalog V3)
   'SCOPE.STORES.PRODUCT_READ',
+  // Site plugin placement status
+  'SCOPE.SITE-PLUGIN.READ-PLACEMENT-STATUS',
 ];
 
 const { WIX_API_KEY, WIX_ACCOUNT_ID } = process.env;

@@ -11,6 +11,10 @@ import {
   Text,
 } from '@wix/design-system';
 import '@wix/design-system/styles.global.css';
+import { detectLocale, translate } from '../../../../lib/i18n';
+
+const locale = detectLocale();
+const t = (key: Parameters<typeof translate>[1], values?: Record<string, string | number>) => translate(locale, key, values);
 
 interface ColorPickerRowProps {
   label: string;
@@ -61,7 +65,7 @@ const FontPickerRow: FC<FontPickerRowProps> = ({ label, font, onChange }) => (
           )
         }
       >
-        {font ? 'Edit Font' : 'Select Font'}
+        {font ? t('editFont') : t('selectFont')}
       </Button>
     </div>
   </SidePanel.Field>
@@ -69,9 +73,9 @@ const FontPickerRow: FC<FontPickerRowProps> = ({ label, font, onChange }) => (
 
 const Panel: FC = () => {
   // Texts
-  const [heading, setHeading] = useState('A little something extra for you');
-  const [subheading, setSubheading] = useState('Special offer selected exclusively for your order.');
-  const [ctaText, setCtaText] = useState('Claim Offer');
+  const [heading, setHeading] = useState(t('previewHeading'));
+  const [subheading, setSubheading] = useState(t('previewSubheading'));
+  const [ctaText, setCtaText] = useState(t('claimOffer'));
 
   // Fonts
   const [headingFont, setHeadingFont] = useState('');
@@ -157,12 +161,12 @@ const Panel: FC = () => {
   return (
     <WixDesignSystemProvider>
       <SidePanel width="320px" height="100vh">
-        <SidePanel.Header title="Post-Purchase Offers Settings" />
+        <SidePanel.Header title={t('postPurchaseSettings')} />
         <SidePanel.Content stretchVertically>
           {/* HEADLINE SECTION */}
-          <SidePanel.Section title="Main Heading">
+          <SidePanel.Section title={t('mainHeading')}>
             <SidePanel.Field>
-              <FormField label="Heading Text">
+              <FormField label={t('headingText')}>
                 <Input
                   type="text"
                   value={heading}
@@ -170,26 +174,26 @@ const Panel: FC = () => {
                     setHeading(e.target.value);
                     widget.setProp('heading', e.target.value);
                   }}
-                  aria-label="Heading Text"
+                  aria-label={t('headingText')}
                 />
               </FormField>
             </SidePanel.Field>
             <FontPickerRow
-              label="Heading Font"
+              label={t('headingFont')}
               font={headingFont}
               onChange={(f) => handleFontUpdate('heading-font', f, setHeadingFont)}
             />
             <ColorPickerRow
-              label="Heading Color"
+              label={t('headingColor')}
               color={headingColor}
               onChange={(c) => handleColorUpdate('heading-color', c, setHeadingColor)}
             />
           </SidePanel.Section>
 
           {/* SUBHEADING SECTION */}
-          <SidePanel.Section title="Subheading">
+          <SidePanel.Section title={t('subheading')}>
             <SidePanel.Field>
-              <FormField label="Subheading Text">
+              <FormField label={t('subheadingText')}>
                 <Input
                   type="text"
                   value={subheading}
@@ -197,75 +201,75 @@ const Panel: FC = () => {
                     setSubheading(e.target.value);
                     widget.setProp('subheading', e.target.value);
                   }}
-                  aria-label="Subheading Text"
+                  aria-label={t('subheadingText')}
                 />
               </FormField>
             </SidePanel.Field>
             <FontPickerRow
-              label="Subheading Font"
+              label={t('subheadingFont')}
               font={subheadingFont}
               onChange={(f) => handleFontUpdate('subheading-font', f, setSubheadingFont)}
             />
             <ColorPickerRow
-              label="Subheading Color"
+              label={t('subheadingColor')}
               color={subheadingColor}
               onChange={(c) => handleColorUpdate('subheading-color', c, setSubheadingColor)}
             />
           </SidePanel.Section>
 
           {/* PRODUCT CARDS SECTION */}
-          <SidePanel.Section title="Product Cards">
+          <SidePanel.Section title={t('productCards')}>
             <ColorPickerRow
-              label="Card Background"
+              label={t('cardBackground')}
               color={cardBgColor}
               onChange={(c) => handleColorUpdate('card-bg-color', c, setCardBgColor)}
             />
             <FontPickerRow
-              label="Product Title Font"
+              label={t('productTitleFont')}
               font={productTitleFont}
               onChange={(f) => handleFontUpdate('product-title-font', f, setProductTitleFont)}
             />
             <ColorPickerRow
-              label="Product Title Color"
+              label={t('productTitleColor')}
               color={productTitleColor}
               onChange={(c) => handleColorUpdate('product-title-color', c, setProductTitleColor)}
             />
             <FontPickerRow
-              label="Price Font"
+              label={t('priceFont')}
               font={priceFont}
               onChange={(f) => handleFontUpdate('price-font', f, setPriceFont)}
             />
             <ColorPickerRow
-              label="Price Color"
+              label={t('priceColor')}
               color={priceColor}
               onChange={(c) => handleColorUpdate('price-color', c, setPriceColor)}
             />
             <FontPickerRow
-              label="Recommendation Note Font"
+              label={t('recommendationNoteFont')}
               font={reasonFont}
               onChange={(f) => handleFontUpdate('reason-font', f, setReasonFont)}
             />
             <ColorPickerRow
-              label="Recommendation Note Color"
+              label={t('recommendationNoteColor')}
               color={reasonColor}
               onChange={(c) => handleColorUpdate('reason-color', c, setReasonColor)}
             />
             <ColorPickerRow
-              label="Discount Badge Background"
+              label={t('discountBadgeBackground')}
               color={badgeBgColor}
               onChange={(c) => handleColorUpdate('badge-bg-color', c, setBadgeBgColor)}
             />
             <ColorPickerRow
-              label="Discount Badge Text Color"
+              label={t('discountBadgeTextColor')}
               color={badgeTextColor}
               onChange={(c) => handleColorUpdate('badge-text-color', c, setBadgeTextColor)}
             />
           </SidePanel.Section>
 
           {/* CTA BUTTON SECTION */}
-          <SidePanel.Section title="Action Button (CTA)">
+          <SidePanel.Section title={t('actionButton')}>
             <SidePanel.Field>
-              <FormField label="Button Label">
+              <FormField label={t('buttonLabel')}>
                 <Input
                   type="text"
                   value={ctaText}
@@ -273,36 +277,36 @@ const Panel: FC = () => {
                     setCtaText(e.target.value);
                     widget.setProp('cta-text', e.target.value);
                   }}
-                  aria-label="Button Label"
+                  aria-label={t('buttonLabel')}
                 />
               </FormField>
             </SidePanel.Field>
             <FontPickerRow
-              label="Button Font"
+              label={t('buttonFont')}
               font={buttonFont}
               onChange={(f) => handleFontUpdate('button-font', f, setButtonFont)}
             />
             <ColorPickerRow
-              label="Button Background"
+              label={t('buttonBackground')}
               color={buttonColor}
               onChange={(c) => handleColorUpdate('button-color', c, setButtonColor)}
             />
             <ColorPickerRow
-              label="Button Text Color"
+              label={t('buttonTextColor')}
               color={buttonTextColor}
               onChange={(c) => handleColorUpdate('button-text-color', c, setButtonTextColor)}
             />
           </SidePanel.Section>
 
           {/* CONTAINER & GEOMETRY SECTION */}
-          <SidePanel.Section title="Container & Layout">
+          <SidePanel.Section title={t('containerLayout')}>
             <ColorPickerRow
-              label="Container Background"
+              label={t('containerBackground')}
               color={containerBgColor}
               onChange={(c) => handleColorUpdate('container-bg-color', c, setContainerBgColor)}
             />
             <SidePanel.Field>
-              <FormField label={`Corner Radius (${borderRadius}px)`}>
+              <FormField label={t('cornerRadius', { value: borderRadius })}>
                 <Slider
                   min={0}
                   max={24}

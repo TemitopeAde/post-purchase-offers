@@ -27,6 +27,7 @@ import { BillingTab } from './BillingTab';
 import { ProductPicker } from './ProductPicker';
 import type { DashboardOverviewMetrics } from '../../../../lib/analytics';
 import { campaignFormSchema, type CampaignFormValues } from '../../../../lib/validation/campaign';
+import { getInitialLocale, localeLabel, setStoredLocale, SUPPORTED_LOCALES, translate, type Locale } from '../../../../lib/i18n';
 
 const Box = WdsBox as any;
 const { fetchWithAuth } = httpClient;
@@ -35,12 +36,17 @@ const capitalizeFirstCharacter = (value: string) =>
   value.replace(/^(\s*)(\S)/, (_, leading, first) => `${leading}${first.toUpperCase()}`);
 
 export const PostPurchaseDashboard: FC = () => {
+  const [locale, setLocale] = useState<Locale>(getInitialLocale);
+  const t = (key: Parameters<typeof translate>[1], values?: Record<string, string | number>) => translate(locale, key, values);
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [overviewMetrics, setOverviewMetrics] = useState<DashboardOverviewMetrics | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [billing, setBilling] = useState<BillingStatus | null>(null);
+  const [pluginPlacement, setPluginPlacement] = useState<{ placedInSlot: boolean } | null>(null);
+  const [pluginPlacementLoading, setPluginPlacementLoading] = useState(false);
+  const [showPlacementInstructions, setShowPlacementInstructions] = useState(false);
 
   // New campaign modal form state
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -109,7 +115,7 @@ export const PostPurchaseDashboard: FC = () => {
         }
       } catch (err) {
         console.error('Failed to load selected campaign products:', err);
-        toast.error('Could not load the products selected for this campaign');
+        toast.error(t('loadSelectedProductsFailed'));
       }
     }
     setShowCreateModal(true);
@@ -135,7 +141,7 @@ export const PostPurchaseDashboard: FC = () => {
       setManualProductHasNext(Boolean(result?.hasNext));
     } catch (err) {
       console.error('Failed to load products for manual campaign:', err);
-      toast.error('Could not load store products');
+      toast.error(t('loadStoreProductsFailed'));
     } finally {
       setLoadingManualProducts(false);
     }
@@ -152,21 +158,44 @@ export const PostPurchaseDashboard: FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [metricsRes, campsRes, setRes, billRes] = await Promise.all([
+      const [metricsRes, campsRes, setRes, billRes, placementRes] = await Promise.all([
         fetchWithAuth('/api/dashboard/overview').then((r) => r.json()),
         fetchWithAuth('/api/campaigns').then((r) => r.json()),
         fetchWithAuth('/api/settings').then((r) => r.json()),
         // Includes the Wix app instance's billing details.
         fetchWithAuth('/api/billing').then((r) => r.json()),
+        fetchWithAuth('/api/plugin-placement').then((r) => r.json()),
       ]);
       setOverviewMetrics(metricsRes);
       setCampaigns(Array.isArray(campsRes) ? campsRes : []);
       setSettings(setRes);
       setBilling(billRes);
+      if (typeof placementRes?.placedInSlot === 'boolean') {
+        setPluginPlacement({ placedInSlot: placementRes.placedInSlot });
+      } else {
+        setPluginPlacement(null);
+      }
     } catch (err) {
       console.error('Error loading dashboard data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const refreshPluginPlacement = async () => {
+    setPluginPlacementLoading(true);
+    try {
+      const response = await fetchWithAuth('/api/plugin-placement');
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error || 'Failed to check plugin placement');
+      setPluginPlacement({ placedInSlot: result.placedInSlot === true });
+      toast.success(result.placedInSlot ? t('pluginPlaced') : t('pluginNotPlaced'));
+    } catch (error) {
+      console.error('Failed to check plugin placement:', error);
+      setPluginPlacement(null);
+      toast.error(t('pluginStatusUnknown'));
+    } finally {
+      setPluginPlacementLoading(false);
     }
   };
 
@@ -229,17 +258,17 @@ export const PostPurchaseDashboard: FC = () => {
           setCampaignToToggle(null);
           setActiveTab('billing');
         }
-        toast.error(err.error || 'Could not update the campaign');
+        toast.error(err.error || t('updateCampaignFailed'));
         return;
       }
 
       const action = campaignToToggle.status === 'active' ? 'paused' : 'activated';
       setCampaignToToggle(null);
-      toast.success(`Campaign ${action}`);
+      toast.success(action === 'paused' ? t('campaignPaused') : t('campaignActivated'));
       await fetchData();
     } catch (err) {
       console.error('Failed to toggle campaign:', err);
-      toast.error('Could not update the campaign. Please try again.');
+      toast.error(t('updateCampaignFailed'));
     } finally {
       setIsTogglingCampaign(false);
     }
@@ -254,16 +283,16 @@ export const PostPurchaseDashboard: FC = () => {
       const response = await fetchWithAuth(`/api/campaigns/${id}`, { method: 'DELETE' });
       if (!response.ok) {
         const err = (await response.json().catch(() => ({}))) as { error?: string };
-        toast.error(err.error || 'Could not delete the campaign');
+        toast.error(err.error || t('updateCampaignFailed'));
         return;
       }
 
       setCampaignToDelete(null);
-      toast.success('Campaign deleted');
+      toast.success(t('campaignDeleted'));
       await fetchData();
     } catch (err) {
       console.error('Failed to delete campaign:', err);
-      toast.error('Could not delete the campaign. Please try again.');
+      toast.error(t('updateCampaignFailed'));
     } finally {
       setIsDeletingCampaign(false);
     }
@@ -278,12 +307,12 @@ export const PostPurchaseDashboard: FC = () => {
     });
 
     if (!parsed.success) {
-      toast.error(parsed.error.issues[0]?.message || 'Please check the campaign fields');
+      toast.error(parsed.error.issues[0]?.message || t('checkCampaignFields'));
       return;
     }
 
     if (parsed.data.mode === 'AI' && !canUseAiRecommendations) {
-      toast.error('AI recommendations require a Pro or Business plan.');
+      toast.error(t('smartPlanError'));
       return;
     }
 
@@ -311,25 +340,25 @@ export const PostPurchaseDashboard: FC = () => {
           ...(isEditing ? {} : {
             currency: 'USD',
             fallbackMode: 'RULES',
-            displayHeading: 'Special add-on offer for your order',
-            ctaText: 'Claim Offer',
+            displayHeading: t('specialOffer'),
+            ctaText: t('claimOffer'),
           }),
-          displaySubheading: `Save ${parsed.data.discount}% on these recommended items!`,
+          displaySubheading: t('saveRecommendedItems', { percent: parsed.data.discount }),
         }),
         },
       );
 
       if (res.ok) {
         closeCampaignModal();
-        toast.success(isEditing ? 'Campaign updated' : 'Campaign created and activated');
+        toast.success(isEditing ? t('campaignUpdated') : t('campaignActivated'));
         await fetchData();
       } else {
         const err = (await res.json().catch(() => ({}))) as { error?: string };
-        toast.error(err.error || (isEditing ? 'Failed to update campaign' : 'Failed to create campaign'));
+        toast.error(err.error || (isEditing ? t('failedUpdateCampaign') : t('failedCreateCampaign')));
       }
     } catch (err) {
       console.error('Error saving campaign:', err);
-      toast.error('Could not save campaign. Please try again.');
+      toast.error(t('saveCampaignFailed'));
     } finally {
       setIsSavingCampaign(false);
     }
@@ -352,20 +381,34 @@ export const PostPurchaseDashboard: FC = () => {
   };
 
   return (
-    <BusinessManagerTheme>
+    <BusinessManagerTheme locale={locale}>
       <Page height="100vh">
         <Page.Header
-          title="Smart Post-Purchase Offers"
-          subtitle="Increase Average Order Value (AOV) with smart upsell recommendations on the Thank You page."
+          title={t('appTitle')}
+          subtitle={t('increaseAov')}
           actionsBar={
             <Box gap="SP2">
+              <select
+                aria-label={t('language')}
+                value={locale}
+                onChange={(event) => {
+                  const nextLocale = event.target.value as Locale;
+                  setLocale(nextLocale);
+                  setStoredLocale(nextLocale);
+                }}
+                style={{ height: '32px', borderRadius: '4px', padding: '0 8px' }}
+              >
+                {SUPPORTED_LOCALES.map((option) => (
+                  <option key={option} value={option}>{localeLabel(option)}</option>
+                ))}
+              </select>
               <Button
                 skin="standard"
                 priority="secondary"
                 prefixIcon={<Refresh />}
                 onClick={fetchData}
               >
-                Refresh
+                {t('refresh')}
               </Button>
               <Button
                 skin="standard"
@@ -373,7 +416,7 @@ export const PostPurchaseDashboard: FC = () => {
                 prefixIcon={<Add />}
                 onClick={openCreateCampaign}
               >
-                Create Campaign
+                {t('createCampaign')}
               </Button>
             </Box>
           }
@@ -385,11 +428,11 @@ export const PostPurchaseDashboard: FC = () => {
               activeId={activeTab}
               onClick={(tab) => handleTabChange(tab.id as string)}
               items={[
-                { id: 'overview', title: 'Overview' },
-                { id: 'campaigns', title: 'Campaigns' },
-                { id: 'ai', title: 'Smart Recommendations' },
-                { id: 'storefront', title: 'Storefront Preview' },
-                { id: 'billing', title: 'Billing & Plan' },
+                { id: 'overview', title: t('overview') },
+                { id: 'campaigns', title: t('campaigns') },
+                { id: 'ai', title: t('smartRecommendations') },
+                { id: 'storefront', title: t('storefrontPreview') },
+                { id: 'billing', title: t('billingPlan') },
               ]}
             />
 
@@ -408,13 +451,13 @@ export const PostPurchaseDashboard: FC = () => {
                     <Card>
                       <Card.Content>
                         <Text size="small" secondary>
-                          Attributed Additional Revenue
+                          {t('attributedRevenue')}
                         </Text>
                         <Heading size="medium">
                           ${overviewMetrics?.totalAttributedRevenue.toFixed(2) || '0.00'}
                         </Heading>
                         <Text size="tiny" skin="success">
-                          +100% post-purchase sales
+                          {t('postPurchaseSales')}
                         </Text>
                       </Card.Content>
                     </Card>
@@ -424,13 +467,13 @@ export const PostPurchaseDashboard: FC = () => {
                     <Card>
                       <Card.Content>
                         <Text size="small" secondary>
-                          Offer Impressions
+                          {t('offerImpressions')}
                         </Text>
                         <Heading size="medium">
                           {overviewMetrics?.totalImpressions || 0}
                         </Heading>
                         <Text size="tiny" secondary>
-                          Total views on Thank You page
+                          {t('totalViews')}
                         </Text>
                       </Card.Content>
                     </Card>
@@ -440,13 +483,13 @@ export const PostPurchaseDashboard: FC = () => {
                     <Card>
                       <Card.Content>
                         <Text size="small" secondary>
-                          Click-Through Rate (CTR)
+                          {t('clickThroughRate')}
                         </Text>
                         <Heading size="medium">
                           {overviewMetrics?.ctr || 0}%
                         </Heading>
                         <Text size="tiny" secondary>
-                          {overviewMetrics?.totalClicks || 0} total clicks
+                          {t('totalClicks', { count: overviewMetrics?.totalClicks || 0 })}
                         </Text>
                       </Card.Content>
                     </Card>
@@ -456,13 +499,13 @@ export const PostPurchaseDashboard: FC = () => {
                     <Card>
                       <Card.Content>
                         <Text size="small" secondary>
-                          Offer Conversion Rate
+                          {t('conversionRate')}
                         </Text>
                         <Heading size="medium">
                           {overviewMetrics?.conversionRate || 0}%
                         </Heading>
                         <Text size="tiny" skin="success">
-                          {overviewMetrics?.totalPurchases || 0} accepted offers paid
+                          {t('acceptedOffers', { count: overviewMetrics?.totalPurchases || 0 })}
                         </Text>
                       </Card.Content>
                     </Card>
@@ -472,20 +515,63 @@ export const PostPurchaseDashboard: FC = () => {
                 {/* Recommendation Engine Performance & Status Banner */}
                 <Card>
                   <Card.Header
-                    title="Smart Recommendation Engine"
-                    subtitle="Hybrid recommendation pipeline with automated candidate validation"
+                    title={t('pluginPlacement')}
+                    subtitle={t('pluginPlacementDescription')}
+                    suffix={
+                      <Badge skin={pluginPlacement?.placedInSlot ? 'success' : pluginPlacement ? 'warning' : 'neutral'}>
+                        {pluginPlacement?.placedInSlot ? t('pluginPlaced') : pluginPlacement ? t('pluginNotPlaced') : t('pluginStatusUnknown')}
+                      </Badge>
+                    }
+                  />
+                  <Card.Content>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <Text size="small" secondary>
+                        {pluginPlacement?.placedInSlot
+                          ? t('pluginPlaced')
+                          : t('pluginPlacementInstructions')}
+                      </Text>
+                      <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
+                        <Button
+                          size="small"
+                          skin="standard"
+                          priority="secondary"
+                          onClick={() => void refreshPluginPlacement()}
+                          disabled={pluginPlacementLoading}
+                        >
+                          {pluginPlacementLoading ? t('loading') : t('checkPlacementStatus')}
+                        </Button>
+                        {!pluginPlacement?.placedInSlot && (
+                          <Button
+                            size="small"
+                            skin="standard"
+                            priority="primary"
+                            onClick={() => setShowPlacementInstructions(true)}
+                          >
+                            {t('addPlugin')}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </Card.Content>
+                </Card>
+
+                {/* Recommendation Engine Performance & Status Banner */}
+                <Card>
+                  <Card.Header
+                    title={t('recommendationEngine')}
+                    subtitle={t('recommendationSubtitle')}
                     suffix={
                       <Badge skin={settings?.aiEnabled ? 'success' : 'neutral'}>
-                        {settings?.aiEnabled ? 'Active' : 'Paused'}
+                        {settings?.aiEnabled ? t('active') : t('paused')}
                       </Badge>
                     }
                   />
                   <Card.Content>
                     <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
                       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <Text weight="bold">Offer Acceptance Rate: {overviewMetrics?.aiAcceptanceRate || 0}%</Text>
+                        <Text weight="bold">{t('acceptanceRate', { value: overviewMetrics?.aiAcceptanceRate || 0 })}</Text>
                         <Text size="small" secondary>
-                          Intelligently ranks candidate products from your Wix Stores catalogue in real time, validating price, stock, and complementary relevance without modifying original orders.
+                          {t('recommendationDescription')}
                         </Text>
                       </div>
                       <Button
@@ -494,7 +580,7 @@ export const PostPurchaseDashboard: FC = () => {
                         priority="secondary"
                         onClick={() => setActiveTab('ai')}
                       >
-                        Configure Engine
+                        {t('configureEngine')}
                       </Button>
                     </div>
                   </Card.Content>
@@ -502,18 +588,18 @@ export const PostPurchaseDashboard: FC = () => {
 
                 {/* Campaign Performance Table */}
                 <Card>
-                  <Card.Header title="Campaign Performance" />
+                  <Card.Header title={t('campaignPerformance')} />
                   <Card.Content>
                     {overviewMetrics?.campaignPerformance && overviewMetrics.campaignPerformance.length > 0 ? (
                       <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                         <thead>
                           <tr style={{ borderBottom: '1px solid #e5e7eb', color: '#6b7280' }}>
-                            <th style={{ padding: '12px 8px' }}>Campaign</th>
-                            <th style={{ padding: '12px 8px' }}>Impressions</th>
-                            <th style={{ padding: '12px 8px' }}>Clicks</th>
-                            <th style={{ padding: '12px 8px' }}>Purchases</th>
-                            <th style={{ padding: '12px 8px' }}>Revenue</th>
-                            <th style={{ padding: '12px 8px' }}>Conversion</th>
+                            <th style={{ padding: '12px 8px' }}>{t('campaign')}</th>
+                            <th style={{ padding: '12px 8px' }}>{t('impressions')}</th>
+                            <th style={{ padding: '12px 8px' }}>{t('clicks')}</th>
+                            <th style={{ padding: '12px 8px' }}>{t('purchases')}</th>
+                            <th style={{ padding: '12px 8px' }}>{t('revenue')}</th>
+                            <th style={{ padding: '12px 8px' }}>{t('conversion')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -535,8 +621,8 @@ export const PostPurchaseDashboard: FC = () => {
                       </table>
                     ) : (
                       <EmptyState
-                        title="No campaign activity yet"
-                        subtitle="Complete a test purchase in your store to see real-time impression and conversion data."
+                        title={t('noCampaignActivity')}
+                        subtitle={t('testPurchase')}
                       />
                     )}
                   </Card.Content>
@@ -549,34 +635,34 @@ export const PostPurchaseDashboard: FC = () => {
               <Box direction="vertical" gap="SP4">
                 <Card>
                   <Card.Header
-                    title="Active Upsell & Cross-Sell Campaigns"
-                    subtitle="Target offers by order subtotal, purchased items, or AI recommendations"
+                    title={t('activeCampaigns')}
+                    subtitle={t('campaignSubtitle')}
                     suffix={
                       <Button
                         size="small"
                         prefixIcon={<Add />}
                         onClick={openCreateCampaign}
                       >
-                        New Campaign
+                        {t('newCampaign')}
                       </Button>
                     }
                   />
                   <Card.Content>
                     {campaigns.length === 0 ? (
                       <EmptyState
-                        title="No campaigns found"
-                        subtitle="Create your first campaign to start recommending complementary products."
+                        title={t('noCampaigns')}
+                        subtitle={t('firstCampaign')}
                       />
                     ) : (
                       <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                         <thead>
                           <tr style={{ borderBottom: '1px solid #e5e7eb', color: '#6b7280' }}>
-                            <th style={{ padding: '12px 8px' }}>Campaign Name</th>
-                            <th style={{ padding: '12px 8px' }}>Mode</th>
-                            <th style={{ padding: '12px 8px' }}>Discount</th>
-                            <th style={{ padding: '12px 8px' }}>Min Order</th>
-                            <th style={{ padding: '12px 8px' }}>Status</th>
-                            <th style={{ padding: '12px 8px', textAlign: 'right' }}>Actions</th>
+                            <th style={{ padding: '12px 8px' }}>{t('campaignName')}</th>
+                            <th style={{ padding: '12px 8px' }}>{t('mode')}</th>
+                            <th style={{ padding: '12px 8px' }}>{t('discount')}</th>
+                            <th style={{ padding: '12px 8px' }}>{t('minimumOrder')}</th>
+                            <th style={{ padding: '12px 8px' }}>{t('status')}</th>
+                            <th style={{ padding: '12px 8px', textAlign: 'right' }}>{t('actions')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -599,7 +685,7 @@ export const PostPurchaseDashboard: FC = () => {
                                   : `$${camp.discountValue} OFF`}
                               </td>
                               <td style={{ padding: '12px 8px' }}>
-                                {camp.minOrderSubtotal ? `$${camp.minOrderSubtotal}` : 'No minimum'}
+                                {camp.minOrderSubtotal ? `$${camp.minOrderSubtotal}` : t('noMinimum')}
                               </td>
                               <td style={{ padding: '12px 8px' }}>
                                 <Badge skin={camp.status === 'active' ? 'success' : 'warning'}>
@@ -614,7 +700,7 @@ export const PostPurchaseDashboard: FC = () => {
                                     priority="secondary"
                                     onClick={() => openEditCampaign(camp)}
                                   >
-                                    Edit
+                                    {t('edit')}
                                   </Button>
                                   <Button
                                     size="tiny"
@@ -622,7 +708,7 @@ export const PostPurchaseDashboard: FC = () => {
                                     priority="secondary"
                                     onClick={() => setCampaignToToggle(camp)}
                                   >
-                                    {camp.status === 'active' ? 'Pause' : 'Activate'}
+                                    {camp.status === 'active' ? t('pause') : t('activate')}
                                   </Button>
                                   <Button
                                     size="tiny"
@@ -648,58 +734,56 @@ export const PostPurchaseDashboard: FC = () => {
                   screen="desktop"
                 >
                   <CustomModalLayout
-                    title={campaignToEdit ? 'Edit Post-Purchase Campaign' : 'Create New Post-Purchase Campaign'}
-                    subtitle={campaignToEdit ? 'Update targeting and discount parameters' : 'Configure targeting and discount parameters'}
+                    title={campaignToEdit ? t('editCampaign') : t('createNewCampaign')}
+                    subtitle={campaignToEdit ? t('updateParameters') : t('configureParameters')}
                     width="600px"
                     maxHeight="640px"
                     overflowY="auto"
                     showHeaderDivider={false}
                     showFooterDivider={false}
                     closeButtonProps={{ size: 'small', onClick: closeCampaignModal }}
-                    primaryButtonText={isSavingCampaign ? 'Saving...' : campaignToEdit ? 'Save Changes' : 'Save & Activate'}
+                    primaryButtonText={isSavingCampaign ? t('saving') : campaignToEdit ? t('saveChanges') : t('saveActivate')}
                     primaryButtonProps={{ disabled: isSavingCampaign }}
                     primaryButtonOnClick={handleSaveCampaign}
-                    secondaryButtonText="Cancel"
+                    secondaryButtonText={t('cancel')}
                     secondaryButtonProps={{ skin: 'dark', priority: 'secondary', disabled: isSavingCampaign }}
                     secondaryButtonOnClick={closeCampaignModal}
                     content={
                       <Box direction="vertical" gap="SP3">
-                        <FormField label="Campaign Name" required>
+                        <FormField label={t('campaignName')} required>
                           <Input
-                            placeholder="e.g. Phone Accessories Upsell"
+                            placeholder={t('productPlaceholder')}
                             value={newCampaignName}
                             onChange={(e) => setNewCampaignName(e.target.value)}
-                            aria-label="Campaign Name"
+                            aria-label={t('campaignName')}
                           />
                         </FormField>
 
-                        <FormField label="Recommendation Mode">
+                        <FormField label={t('recommendationMode')}>
                           <select
                             value={newCampaignMode}
                             onChange={(e) => {
                               const mode = e.target.value as CampaignFormValues['mode'];
                               if (mode === 'AI' && !canUseAiRecommendations) {
-                                toast.error('AI recommendations require a Pro or Business plan.');
+                              toast.error(t('smartPlanError'));
                                 return;
                               }
                               setNewCampaignMode(mode);
                             }}
-                            aria-label="Recommendation Mode"
+                            aria-label={t('recommendationMode')}
                             style={{ width: '100%', height: '36px', borderRadius: '4px', border: '1px solid #c4cdd5', padding: '0 8px' }}
                           >
                             <option value="AI" disabled={!canUseAiRecommendations}>
-                              {canUseAiRecommendations
-                                ? 'Automatic Smart Recommendations'
-                                : 'Automatic Smart Recommendations (Pro or Business required)'}
+                              {canUseAiRecommendations ? t('automaticRecommendations') : t('planRequired')}
                             </option>
-                            <option value="HYBRID">Hybrid (Merchant + Smart Rules)</option>
-                            <option value="RULES">Deterministic Rules (Category & Price)</option>
-                            <option value="MANUAL">Manual Products Only</option>
+                            <option value="HYBRID">{t('hybridMode')}</option>
+                            <option value="RULES">{t('rulesMode')}</option>
+                            <option value="MANUAL">{t('manualMode')}</option>
                           </select>
                         </FormField>
 
                         {(newCampaignMode === 'MANUAL' || newCampaignMode === 'HYBRID') && (
-                          <FormField label="Merchant-selected products">
+                          <FormField label={t('merchantProducts')}>
                             <Box direction="vertical" gap="SP2">
                               <ProductPicker
                                 products={manualProducts}
@@ -710,32 +794,31 @@ export const PostPurchaseDashboard: FC = () => {
                                 loading={loadingManualProducts}
                                 hasNext={manualProductHasNext}
                                 onLoadMore={() => void loadManualProducts(manualProductSearch, manualProductCursor, true)}
+                                locale={locale}
                               />
                             </Box>
-                            <Text size="tiny" secondary>
-                              Manual campaigns show all selected products, in the order you picked them, skipping anything the customer just bought. AI, Rules, and Hybrid campaigns can show up to 4 offers.
-                            </Text>
+                            <Text size="tiny" secondary>{t('manualDescription')}</Text>
                           </FormField>
                         )}
 
                         <Box gap="SP3">
                           <Box direction="vertical" style={{ flex: 1 }}>
-                            <FormField label="Discount Percentage (%)">
+                            <FormField label={t('discountPercentage')}>
                               <Input
                                 type="number"
                                 value={newCampaignDiscount}
                                 onChange={(e) => setNewCampaignDiscount(e.target.value)}
-                                aria-label="Discount Percentage"
+                                aria-label={t('discountPercentage')}
                               />
                             </FormField>
                           </Box>
                           <Box direction="vertical" style={{ flex: 1 }}>
-                            <FormField label="Minimum Order Subtotal ($)">
+                            <FormField label={t('minimumSubtotal')}>
                               <Input
                                 type="number"
                                 value={newCampaignMinSubtotal}
                                 onChange={(e) => setNewCampaignMinSubtotal(e.target.value)}
-                                aria-label="Minimum Order Subtotal"
+                                aria-label={t('minimumSubtotal')}
                               />
                             </FormField>
                           </Box>
@@ -749,23 +832,23 @@ export const PostPurchaseDashboard: FC = () => {
                   isOpen={Boolean(campaignToToggle)}
                   onRequestClose={() => !isTogglingCampaign && setCampaignToToggle(null)}
                   shouldCloseOnOverlayClick={!isTogglingCampaign}
-                  contentLabel={`${campaignToToggle?.status === 'active' ? 'Pause' : 'Activate'} campaign confirmation`}
+                  contentLabel={t('pauseActivateConfirmation', { action: campaignToToggle?.status === 'active' ? t('pause') : t('activate') })}
                   screen="desktop"
                 >
                   <CustomModalLayout
-                    title={`${campaignToToggle?.status === 'active' ? 'Pause' : 'Activate'} campaign?`}
+                    title={t('pauseActivateQuestion', { action: campaignToToggle?.status === 'active' ? t('pause') : t('activate') })}
                     subtitle={campaignToToggle?.name}
                     primaryButtonText={activationNeedsPlan
                       ? billing?.upgradeUrl
-                        ? 'Choose a plan'
-                        : 'View billing'
+                        ? t('choosePlan')
+                        : t('viewBilling')
                       : isTogglingCampaign
                         ? campaignToToggle?.status === 'active'
-                          ? 'Pausing…'
-                          : 'Activating…'
+                          ? t('pausing')
+                          : t('activating')
                         : campaignToToggle?.status === 'active'
-                          ? 'Pause campaign'
-                          : 'Activate campaign'
+                          ? t('pauseCampaign')
+                          : t('activateCampaign')
                     }
                     primaryButtonProps={{
                       skin: campaignToToggle?.status === 'active' ? 'destructive' : 'standard',
@@ -778,7 +861,7 @@ export const PostPurchaseDashboard: FC = () => {
                       }
                       void handleToggleCampaign();
                     }}
-                    secondaryButtonText="Cancel"
+                    secondaryButtonText={t('cancel')}
                     secondaryButtonProps={{ disabled: isTogglingCampaign }}
                     secondaryButtonOnClick={() => setCampaignToToggle(null)}
                     closeButtonProps={{
@@ -788,10 +871,10 @@ export const PostPurchaseDashboard: FC = () => {
                   >
                     <Text>
                       {activationNeedsPlan
-                        ? 'Choose a Pro or Business plan to activate campaigns and show offers to your customers.'
+                        ? t('choosePlanToActivate')
                         : campaignToToggle?.status === 'active'
-                        ? 'This campaign will stop showing post-purchase offers until you activate it again.'
-                        : 'This campaign will start showing post-purchase offers on eligible orders.'}
+                        ? t('pausedCampaignDescription')
+                        : t('activatedCampaignDescription')}
                     </Text>
                   </CustomModalLayout>
                 </Modal>
@@ -800,20 +883,20 @@ export const PostPurchaseDashboard: FC = () => {
                   isOpen={Boolean(campaignToDelete)}
                   onRequestClose={() => !isDeletingCampaign && setCampaignToDelete(null)}
                   shouldCloseOnOverlayClick={!isDeletingCampaign}
-                  contentLabel="Delete campaign confirmation"
+                  contentLabel={t('deleteCampaignQuestion')}
                   screen="desktop"
                 >
                   <CustomModalLayout
                     skin="destructive"
-                    title="Delete campaign?"
-                    subtitle={`This will permanently delete ${campaignToDelete?.name || 'this campaign'}.`}
-                    primaryButtonText={isDeletingCampaign ? 'Deleting…' : 'Delete campaign'}
+                    title={t('deleteCampaignQuestion')}
+                    subtitle={t('permanentlyDelete', { name: campaignToDelete?.name || t('campaign') })}
+                    primaryButtonText={isDeletingCampaign ? t('deleting') : t('deleteCampaign')}
                     primaryButtonProps={{
                       skin: 'destructive',
                       disabled: isDeletingCampaign,
                     }}
                     primaryButtonOnClick={() => void handleDeleteCampaign()}
-                    secondaryButtonText="Cancel"
+                    secondaryButtonText={t('cancel')}
                     secondaryButtonProps={{ disabled: isDeletingCampaign }}
                     secondaryButtonOnClick={() => setCampaignToDelete(null)}
                     closeButtonProps={{
@@ -826,16 +909,41 @@ export const PostPurchaseDashboard: FC = () => {
                     </Text>
                   </CustomModalLayout>
                 </Modal>
+
               </Box>
             )}
+
+            <Modal
+              isOpen={showPlacementInstructions}
+              onRequestClose={() => setShowPlacementInstructions(false)}
+              contentLabel={t('placementInstructionsTitle')}
+              screen="desktop"
+            >
+              <CustomModalLayout
+                title={t('placementInstructionsTitle')}
+                primaryButtonText={t('checkPlacementStatus')}
+                primaryButtonOnClick={() => {
+                  setShowPlacementInstructions(false);
+                  void refreshPluginPlacement();
+                }}
+                secondaryButtonText={t('cancel')}
+                secondaryButtonOnClick={() => setShowPlacementInstructions(false)}
+                closeButtonProps={{
+                  size: 'small',
+                  onClick: () => setShowPlacementInstructions(false),
+                }}
+              >
+                <Text>{t('pluginPlacementInstructions')}</Text>
+              </CustomModalLayout>
+            </Modal>
 
             {/* RECOMMENDATIONS TAB */}
             {!loading && activeTab === 'ai' && (
               <Box direction="vertical" gap="SP4">
                 <Card>
                   <Card.Header
-                    title="Recommendation Engine Configuration"
-                    subtitle="Controls real-time smart ranking over your bounded catalogue"
+                    title={t('recommendationConfiguration')}
+                    subtitle={t('recommendationConfigurationSubtitle')}
                     suffix={
                       <ToggleSwitch
                         checked={settings?.aiEnabled || false}
@@ -847,12 +955,12 @@ export const PostPurchaseDashboard: FC = () => {
                     <Box direction="vertical" gap="SP3">
                       <Box gap="SP3">
                         <Box style={{ flex: 1 }} direction="vertical" gap="SP1">
-                          <Text weight="bold">Engine: Smart Recommendation Service</Text>
-                          <Text size="small" secondary>Real-time catalogue scoring & ranking</Text>
-                          <Text size="small" secondary>Secure server-side processing</Text>
+                          <Text weight="bold">{t('recommendationService')}</Text>
+                          <Text size="small" secondary>{t('catalogueScoring')}</Text>
+                          <Text size="small" secondary>{t('secureProcessing')}</Text>
                         </Box>
                         <Box style={{ flex: 1 }} direction="vertical" gap="SP1">
-                          <Text weight="bold">Data Privacy & Security</Text>
+                          <Text weight="bold">{t('privacySecurity')}</Text>
                           <Text size="small" secondary>
                             Recommendation requests run completely server-side. No customer data or payment details are exposed.
                           </Text>
@@ -863,9 +971,9 @@ export const PostPurchaseDashboard: FC = () => {
 
                       <Box gap="SP3" align="center">
                         <Box direction="vertical" style={{ flex: 1 }}>
-                          <Text weight="bold">Show Recommendation Reasons to Customers</Text>
+                          <Text weight="bold">{t('showRecommendationReasons')}</Text>
                           <Text size="small" secondary>
-                            Display concise explanations on the storefront (e.g. &quot;A protective case helps keep your new phone safe.&quot;)
+                            {t('recommendationReasonsDescription')}
                           </Text>
                         </Box>
                         <ToggleSwitch
@@ -877,9 +985,9 @@ export const PostPurchaseDashboard: FC = () => {
                       <Divider />
 
                       <Box direction="vertical" gap="SP1">
-                        <Text weight="bold">Cost & Usage Protection</Text>
+                        <Text weight="bold">{t('costUsageProtection')}</Text>
                         <Text size="small" secondary>
-                          Monthly requests: {settings?.monthlyAiUsage || 0} / {aiAllowance ?? 'no plan'}
+                          {t('monthlyRequests', { used: settings?.monthlyAiUsage || 0, limit: aiAllowance ?? 'no plan' })}
                         </Text>
                         <div style={{ width: '100%', height: '8px', background: '#e5e7eb', borderRadius: '4px', overflow: 'hidden' }}>
                           <div
@@ -903,16 +1011,16 @@ export const PostPurchaseDashboard: FC = () => {
                 <SectionHelper
                   fullWidth
                   skin="standard"
-                  title="Appearance Managed in Wix Editor / Studio"
+                  title={t('editorAppearance')}
                 >
-                  Typography (fonts) and colors for each element (headings, subheadings, cards, product titles, prices, and CTA buttons) are customized directly in the Wix Studio / Editor canvas via the widget&apos;s Settings Panel.
+                  {t('editorAppearanceDescription')}
                 </SectionHelper>
 
                 {/* LIVE STOREFRONT PREVIEW */}
                 <Card>
                   <Card.Header
-                    title="Live Preview on Thank You Page"
-                    subtitle="This is how offers appear to customers after completing checkout"
+                    title={t('livePreview')}
+                    subtitle={t('livePreviewSubtitle')}
                   />
                   <Card.Content>
                     <div style={{ background: '#f3f4f6', padding: '24px', borderRadius: '8px' }}>
@@ -928,10 +1036,10 @@ export const PostPurchaseDashboard: FC = () => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                           <div>
                             <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#111827' }}>
-                              {settings?.headline || 'A little something extra for you'}
+                              {settings?.headline || t('previewHeading')}
                             </h3>
                             <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#6b7280' }}>
-                              {settings?.subheadline || 'Complementary picks tailored to your order.'}
+                              {settings?.subheadline || t('previewSubheading')}
                             </p>
                           </div>
                           <button style={{ background: 'transparent', border: 'none', color: '#9ca3af', fontSize: '12px', textDecoration: 'underline' }}>
@@ -947,8 +1055,8 @@ export const PostPurchaseDashboard: FC = () => {
                             <div style={{ height: '120px', background: '#f9fafb', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px' }}>
                               <span style={{ fontSize: '32px' }}>⚡️</span>
                             </div>
-                            <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>High-Speed Fast Charger & Cable</div>
-                            <div style={{ fontSize: '12px', color: '#4b5563', marginBottom: '12px' }}>✦ Ideal charging accessory for your new device.</div>
+                            <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>{t('previewProduct')}</div>
+                            <div style={{ fontSize: '12px', color: '#4b5563', marginBottom: '12px' }}>{t('previewReason')}</div>
                             <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '12px' }}>
                               <span style={{ fontSize: '16px', fontWeight: 700 }}>$21.25</span>
                               <span style={{ fontSize: '12px', color: '#9ca3af', textDecoration: 'line-through' }}>$25.00</span>
@@ -977,7 +1085,7 @@ export const PostPurchaseDashboard: FC = () => {
             )}
 
             {/* BILLING & PLAN TAB */}
-            {!loading && activeTab === 'billing' && <BillingTab billing={billing} />}
+            {!loading && activeTab === 'billing' && <BillingTab billing={billing} locale={locale} />}
           </Box>
         </Page.Content>
         </Page>

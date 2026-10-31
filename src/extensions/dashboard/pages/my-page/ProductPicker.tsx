@@ -12,6 +12,7 @@ import {
   TextButton,
 } from '@wix/design-system';
 import type { ProductCandidate } from '../../../../lib/types';
+import { translate, type Locale } from '../../../../lib/i18n';
 
 // Same workaround as my-page.tsx: WDS Box's typings clash with this project's React types.
 const Box = WdsBox as any;
@@ -25,6 +26,7 @@ interface ProductPickerProps {
   loading: boolean;
   hasNext: boolean;
   onLoadMore: () => void;
+  locale: Locale;
 }
 
 const formatPrice = (product: ProductCandidate) => `$${product.price.toFixed(2)}`;
@@ -38,7 +40,9 @@ export const ProductPicker: FC<ProductPickerProps> = ({
   loading,
   hasNext,
   onLoadMore,
+  locale,
 }) => {
+  const t = (key: Parameters<typeof translate>[1], values?: Record<string, string | number>) => translate(locale, key, values);
   const selectedIds = new Set(selected.map((product) => product.productId));
 
   const toggle = (product: ProductCandidate) =>
@@ -54,14 +58,14 @@ export const ProductPicker: FC<ProductPickerProps> = ({
         value={search}
         onChange={(e) => onSearchChange(e.target.value)}
         onClear={() => onSearchChange('')}
-        placeholder="Search products"
+        placeholder={t('searchProducts')}
       />
 
       {selected.length > 0 && (
         <Box direction="vertical" gap="SP1">
           <Box verticalAlign="middle" gap="SP2">
-            <Text size="small" weight="bold">{selected.length} selected</Text>
-            <TextButton size="small" onClick={() => onChange([])}>Clear all</TextButton>
+            <Text size="small" weight="bold">{t('selected', { count: selected.length })}</Text>
+            <TextButton size="small" onClick={() => onChange([])}>{t('clearAll')}</TextButton>
           </Box>
           <Box gap="SP1" style={{ flexWrap: 'wrap' }}>
             {selected.map((product) => (
@@ -90,7 +94,7 @@ export const ProductPicker: FC<ProductPickerProps> = ({
         {products.length === 0 && !loading && (
           <Box padding="SP4" align="center">
             <Text size="small" secondary>
-              {search ? `No products match "${search}"` : 'No products found in your store'}
+              {search ? t('noProductsMatch', { search }) : t('noProductsFound')}
             </Text>
           </Box>
         )}
@@ -122,7 +126,7 @@ export const ProductPicker: FC<ProductPickerProps> = ({
                 <Text size="small" weight="bold" ellipsis>{product.name}</Text>
                 <Text size="tiny" secondary>{formatPrice(product)}</Text>
               </Box>
-              {!product.inStock && <Badge size="small" skin="neutralLight">Out of stock</Badge>}
+              {!product.inStock && <Badge size="small" skin="neutralLight">{t('outOfStock')}</Badge>}
             </Box>
           );
         })}
@@ -137,7 +141,7 @@ export const ProductPicker: FC<ProductPickerProps> = ({
       {hasNext && (
         <Box>
           <Button size="small" priority="secondary" disabled={loading} onClick={onLoadMore}>
-            Load more products
+            {t('loadMoreProducts')}
           </Button>
         </Box>
       )}
