@@ -1,0 +1,36 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thank You Page</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&display=block" rel="stylesheet">
+<style>
+  /* Sample store Thank You page behind the real widget. */
+  body { margin: 0; background: #faf8f5; font-family: Arial, sans-serif; color: #111; }
+  .nav { height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 44px; background: #fff; border-bottom: 1px solid #ece7df; }
+  .brand { font-family: 'Playfair Display', serif; font-size: 22px; letter-spacing: 1px; }
+  .links { display: flex; gap: 28px; font-size: 13px; color: #444; }
+  .ty { max-width: 620px; margin: 40px auto; padding: 0 20px; }
+  .ty h1 { font-family: 'Playfair Display', serif; font-size: 30px; margin: 0 0 6px; }
+  .ty p { color: #666; font-size: 14px; }
+  .line { display: flex; align-items: center; gap: 16px; padding: 14px 0; border-top: 1px solid #ece7df; font-size: 14px; }
+  .line img { width: 64px; height: 64px; border-radius: 6px; object-fit: cover; }
+  .line span { flex: 1; }
+  /* The widget focuses its dialog on open; hide Chrome's focus ring in screenshots. */
+  .ppo-dialog:focus { outline: none; }
+  body.editor { background: #e9edf2; }
+  body.editor .nav, body.editor .ty { display: none; }
+  @media (max-width: 500px) { .links { display: none; } .nav { padding: 0 20px; } }
+</style>
+</head>
+<body>
+<div class="nav"><div class="brand">NORTHWIND</div><div class="links"><span>Shop</span><span>Headphones</span><span>Speakers</span><span>About</span></div></div>
+<div class="ty">
+  <h1>Thank you, Alex!</h1>
+  <p>Order #10482 is confirmed. A confirmation email is on its way.</p>
+  <div class="line"><img id="purchased" alt=""><span>Studio Wireless Headphones</span><b>$189.00</b></div>
+</div>
+<script type="module" src="./plugin.ts"></script>
+</body>
+</html>

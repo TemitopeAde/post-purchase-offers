@@ -15,12 +15,16 @@ import {
   ToggleSwitch,
   EmptyState,
   SectionHelper,
+  Modal,
+  CustomModalLayout,
 } from '@wix/design-system';
 import { Add, Delete, Check, Refresh } from '@wix/wix-ui-icons-common/lazy';
 import { httpClient } from '@wix/essentials';
+import { Toaster, toast } from 'sonner';
 import { BusinessManagerTheme } from '../../BusinessManagerTheme';
 import type { Campaign, AppSettings } from '../../../../lib/types';
 import type { DashboardOverviewMetrics } from '../../../../lib/analytics';
+import { campaignFormSchema, type CampaignFormValues } from '../../../../lib/validation/campaign';
 
 const Box = WdsBox as any;
 const { fetchWithAuth } = httpClient;
@@ -37,7 +41,7 @@ export const PostPurchaseDashboard: FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newCampaignName, setNewCampaignName] = useState('');
   const [newCampaignDiscount, setNewCampaignDiscount] = useState('15');
-  const [newCampaignMode, setNewCampaignMode] = useState<any>('AI');
+  const [newCampaignMode, setNewCampaignMode] = useState<CampaignFormValues['mode']>('AI');
   const [newCampaignMinSubtotal, setNewCampaignMinSubtotal] = useState('0');
   const [isSavingCampaign, setIsSavingCampaign] = useState(false);
 
@@ -87,8 +91,15 @@ export const PostPurchaseDashboard: FC = () => {
   };
 
   const handleCreateCampaign = async () => {
-    if (!newCampaignName.trim()) {
-      alert('Please enter a campaign name');
+    const parsed = campaignFormSchema.safeParse({
+      name: newCampaignName,
+      discount: newCampaignDiscount,
+      minSubtotal: newCampaignMinSubtotal,
+      mode: newCampaignMode,
+    });
+
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message || 'Please check the campaign fields');
       return;
     }
 
@@ -98,16 +109,16 @@ export const PostPurchaseDashboard: FC = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: newCampaignName.trim(),
+          name: parsed.data.name,
           status: 'active',
           priority: 5,
-          minOrderSubtotal: parseFloat(newCampaignMinSubtotal) || 0,
+          minOrderSubtotal: parsed.data.minSubtotal,
           currency: 'USD',
-          recommendationMode: newCampaignMode,
+          recommendationMode: parsed.data.mode,
           maxOffers: 2,
           fallbackMode: 'RULES',
           discountType: 'PERCENTAGE',
-          discountValue: parseFloat(newCampaignDiscount) || 15,
+          discountValue: parsed.data.discount,
           displayHeading: 'Special add-on offer for your order',
           displaySubheading: `Save ${newCampaignDiscount}% on these recommended items!`,
           ctaText: 'Claim Offer',
@@ -117,13 +128,18 @@ export const PostPurchaseDashboard: FC = () => {
       if (res.ok) {
         setShowCreateModal(false);
         setNewCampaignName('');
+        setNewCampaignDiscount('15');
+        setNewCampaignMinSubtotal('0');
+        setNewCampaignMode('AI');
+        toast.success('Campaign created and activated');
         await fetchData();
       } else {
-        const err = await res.json();
-        alert(err?.error || 'Failed to create campaign');
+        const err = (await res.json().catch(() => ({}))) as { error?: string };
+        toast.error(err.error || 'Failed to create campaign');
       }
     } catch (err) {
       console.error('Error creating campaign:', err);
+      toast.error('Could not create campaign. Please try again.');
     } finally {
       setIsSavingCampaign(false);
     }
@@ -425,81 +441,78 @@ export const PostPurchaseDashboard: FC = () => {
                   </Card.Content>
                 </Card>
 
-                {/* CREATE CAMPAIGN CARD (MODAL INLINE) */}
-                {showCreateModal && (
-                  <Card>
-                    <Card.Header
-                      title="Create New Post-Purchase Campaign"
-                      subtitle="Configure targeting and discount parameters"
-                    />
-                    <Card.Content>
+                <Modal
+                  isOpen={showCreateModal}
+                  onRequestClose={() => setShowCreateModal(false)}
+                  shouldCloseOnOverlayClick={!isSavingCampaign}
+                  screen="desktop"
+                >
+                  <CustomModalLayout
+                    title="Create New Post-Purchase Campaign"
+                    subtitle="Configure targeting and discount parameters"
+                    width="600px"
+                    maxHeight="640px"
+                    overflowY="auto"
+                    showHeaderDivider={false}
+                    showFooterDivider={false}
+                    closeButtonProps={{ size: 'small', onClick: () => setShowCreateModal(false) }}
+                    primaryButtonText={isSavingCampaign ? 'Creating...' : 'Save & Activate'}
+                    primaryButtonProps={{ disabled: isSavingCampaign }}
+                    primaryButtonOnClick={handleCreateCampaign}
+                    secondaryButtonText="Cancel"
+                    secondaryButtonProps={{ skin: 'dark', priority: 'secondary', disabled: isSavingCampaign }}
+                    secondaryButtonOnClick={() => setShowCreateModal(false)}
+                    content={
                       <Box direction="vertical" gap="SP3">
                         <FormField label="Campaign Name" required>
                           <Input
                             placeholder="e.g. Phone Accessories Upsell"
                             value={newCampaignName}
                             onChange={(e) => setNewCampaignName(e.target.value)}
+                            aria-label="Campaign Name"
                           />
                         </FormField>
 
-                        <div style={{ display: 'flex', gap: '16px' }}>
-                          <div style={{ flex: 1 }}>
-                            <FormField label="Recommendation Mode">
-                              <select
-                                value={newCampaignMode}
-                                onChange={(e) => setNewCampaignMode(e.target.value)}
-                                style={{ width: '100%', height: '36px', borderRadius: '4px', border: '1px solid #c4cdd5', padding: '0 8px' }}
-                              >
-                                <option value="AI">Automatic Smart Recommendations</option>
-                                <option value="HYBRID">Hybrid (Merchant + Smart Rules)</option>
-                                <option value="RULES">Deterministic Rules (Category & Price)</option>
-                                <option value="MANUAL">Manual Products Only</option>
-                              </select>
-                            </FormField>
-                          </div>
+                        <FormField label="Recommendation Mode">
+                          <select
+                            value={newCampaignMode}
+                            onChange={(e) => setNewCampaignMode(e.target.value as CampaignFormValues['mode'])}
+                            aria-label="Recommendation Mode"
+                            style={{ width: '100%', height: '36px', borderRadius: '4px', border: '1px solid #c4cdd5', padding: '0 8px' }}
+                          >
+                            <option value="AI">Automatic Smart Recommendations</option>
+                            <option value="HYBRID">Hybrid (Merchant + Smart Rules)</option>
+                            <option value="RULES">Deterministic Rules (Category & Price)</option>
+                            <option value="MANUAL">Manual Products Only</option>
+                          </select>
+                        </FormField>
 
-                          <div style={{ flex: 1 }}>
+                        <Box gap="SP3">
+                          <Box direction="vertical" style={{ flex: 1 }}>
                             <FormField label="Discount Percentage (%)">
                               <Input
                                 type="number"
                                 value={newCampaignDiscount}
                                 onChange={(e) => setNewCampaignDiscount(e.target.value)}
+                                aria-label="Discount Percentage"
                               />
                             </FormField>
-                          </div>
-
-                          <div style={{ flex: 1 }}>
+                          </Box>
+                          <Box direction="vertical" style={{ flex: 1 }}>
                             <FormField label="Minimum Order Subtotal ($)">
                               <Input
                                 type="number"
                                 value={newCampaignMinSubtotal}
                                 onChange={(e) => setNewCampaignMinSubtotal(e.target.value)}
+                                aria-label="Minimum Order Subtotal"
                               />
                             </FormField>
-                          </div>
-                        </div>
-
-                        <Box gap="SP2" justify="right" style={{ marginTop: '12px' }}>
-                          <Button
-                            skin="standard"
-                            priority="secondary"
-                            onClick={() => setShowCreateModal(false)}
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            skin="standard"
-                            priority="primary"
-                            disabled={isSavingCampaign}
-                            onClick={handleCreateCampaign}
-                          >
-                            {isSavingCampaign ? 'Creating...' : 'Save & Activate'}
-                          </Button>
+                          </Box>
                         </Box>
                       </Box>
-                    </Card.Content>
-                  </Card>
-                )}
+                    }
+                  />
+                </Modal>
               </Box>
             )}
 
@@ -693,7 +706,8 @@ export const PostPurchaseDashboard: FC = () => {
             )}
           </Box>
         </Page.Content>
-      </Page>
+        </Page>
+        <Toaster position="top-right" richColors closeButton />
     </BusinessManagerTheme>
   );
 };

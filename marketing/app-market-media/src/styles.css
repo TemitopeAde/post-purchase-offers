@@ -1,0 +1,30 @@
+/* Shared styles for App Market listing images (1200 x 900, 4:3).
+   Screenshots in ../shots come from capture.sh (the app's real UI). */
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 1200px; height: 900px; overflow: hidden; }
+
+body.slide {
+  background: #116dff;
+  font-family: 'Roboto', Arial, sans-serif;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.cap { text-align: center; padding: 54px 80px 34px; }
+.cap h1 { font-size: 40px; font-weight: 700; margin: 0 0 10px; letter-spacing: -0.3px; }
+.cap p { font-size: 20px; margin: 0; opacity: 0.92; }
+
+.stage { flex: 1; width: 1040px; position: relative; }
+
+/* Browser window that bleeds off the bottom edge */
+.window {
+  position: absolute; inset: 0 0 -60px 0;
+  background: #fff; border-radius: 12px 12px 0 0; overflow: hidden;
+  box-shadow: 0 30px 80px rgba(0, 20, 80, 0.35);
+}
+.chrome { height: 34px; background: #eef1f5; display: flex; align-items: center; gap: 7px; padding: 0 14px; border-bottom: 1px solid #dfe3ea; }
+.chrome i { width: 11px; height: 11px; border-radius: 50%; background: #d3d8e0; display: block; }
+.chrome .url { margin-left: 18px; flex: 1; max-width: 420px; height: 20px; border-radius: 10px; background: #fff; font-size: 11px; color: #7a8299; display: flex; align-items: center; padding: 0 12px; }
+.window > img.shot { display: block; width: 100%; }

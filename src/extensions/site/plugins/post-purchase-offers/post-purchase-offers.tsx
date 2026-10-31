@@ -1,7 +1,9 @@
-import { window as wixWindow } from '@wix/site-window';
 import { httpClient } from '@wix/essentials';
 
 const fetchWithAuth = httpClient.fetchWithAuth || fetch;
+
+// Resolve API routes against the app server, not the host site origin.
+const apiUrl = (path: string) => new URL(path, import.meta.url).href;
 
 class PostPurchaseOffersElement extends HTMLElement {
   static get observedAttributes() {
@@ -36,6 +38,7 @@ class PostPurchaseOffersElement extends HTMLElement {
   private isDismissed = false;
   private isProcessingCheckout = false;
   private hasFetched = false;
+  private escapeHandler: ((event: KeyboardEvent) => void) | null = null;
 
   constructor() {
     super();
@@ -51,47 +54,12 @@ class PostPurchaseOffersElement extends HTMLElement {
     }
   }
 
-  private async isEditorMode(): Promise<boolean> {
-    try {
-      const mode = await wixWindow.viewMode();
-      return mode === 'Editor' || mode === 'Preview';
-    } catch {
-      return false;
-    }
-  }
-
   private async init() {
-    const isEditor = await this.isEditorMode();
     const orderId = this.getAttribute('order-id');
 
-    if (isEditor || !orderId) {
-      // In Wix Editor or preview mode, show high-fidelity preview
-      this.offersData = {
-        campaign: {
-          id: 'preview-campaign',
-          name: 'Post-Purchase Deals',
-          heading: this.getAttribute('heading') || 'A little something extra for you',
-          subheading:
-            this.getAttribute('subheading') ||
-            'Special offer selected exclusively for your recent order.',
-          ctaText: 'Claim Offer',
-        },
-        offers: [
-          {
-            _id: 'preview-offer-1',
-            productId: 'preview-prod-1',
-            productName: 'Fast Charging Power Adapter & Braided Cable',
-            productImageUrl: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=400&q=80',
-            regularPrice: 29.99,
-            offerPrice: 22.49,
-            discountType: 'PERCENTAGE',
-            discountValue: 25,
-            badge: '25% OFF',
-            reason: 'High-speed charger matches perfectly with your new electronic device.',
-          },
-        ],
-        source: 'ai',
-      };
+    if (!orderId) {
+      // Do not render an offer without a real completed order.
+      this.offersData = null;
       this.hasFetched = true;
       this.render();
       return;
@@ -102,7 +70,7 @@ class PostPurchaseOffersElement extends HTMLElement {
     this.render();
 
     try {
-      const response = await fetchWithAuth('/api/recommendations', {
+      const response = await fetchWithAuth(apiUrl('/api/recommendations'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -137,7 +105,7 @@ class PostPurchaseOffersElement extends HTMLElement {
 
     const orderId = this.getAttribute('order-id');
     if (orderId && this.offersData?.campaign?.id) {
-      fetchWithAuth('/api/offers/interaction', {
+      fetchWithAuth(apiUrl('/api/offers/interaction'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -159,7 +127,7 @@ class PostPurchaseOffersElement extends HTMLElement {
     const orderId = this.getAttribute('order-id');
 
     try {
-      const response = await fetchWithAuth('/api/offers/checkout', {
+      const response = await fetchWithAuth(apiUrl('/api/offers/checkout'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -192,6 +160,8 @@ class PostPurchaseOffersElement extends HTMLElement {
   }
 
   render() {
+    this.removeEscapeHandler();
+
     if (this.isDismissed) {
       this.innerHTML = '';
       return;
@@ -316,27 +286,41 @@ class PostPurchaseOffersElement extends HTMLElement {
       .join('');
 
     this.innerHTML = `
-      <div style="font-family: Arial, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: ${containerBgColor}; border: 1px solid #e5e7eb; border-radius: ${borderRadius}px; padding: 24px; margin: 20px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px;">
-          <div>
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-              <h2 style="${headingFont ? `font: ${headingFont};` : 'font-size: 18px; font-weight: 700;'} color: ${headingColor}; margin: 0;">${heading}</h2>
+      <div class="ppo-overlay" role="presentation" style="position: fixed; inset: 0; z-index: 2147483647; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(17, 24, 39, 0.62); font-family: Arial, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; box-sizing: border-box;">
+        <div class="ppo-dialog" role="dialog" aria-modal="true" aria-labelledby="ppo-heading" tabindex="-1" style="position: relative; width: min(720px, 100%); max-height: min(760px, calc(100vh - 40px)); overflow: auto; background: ${containerBgColor}; border: 1px solid #e5e7eb; border-radius: ${borderRadius}px; padding: 24px; box-shadow: 0 24px 80px rgba(0,0,0,0.24); box-sizing: border-box;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                <h2 id="ppo-heading" style="${headingFont ? `font: ${headingFont};` : 'font-size: 18px; font-weight: 700;'} color: ${headingColor}; margin: 0;">${heading}</h2>
+              </div>
+              <p style="${subheadingFont ? `font: ${subheadingFont};` : 'font-size: 13px;'} color: ${subheadingColor}; margin: 0;">${subheading}</p>
             </div>
-            <p style="${subheadingFont ? `font: ${subheadingFont};` : 'font-size: 13px;'} color: ${subheadingColor}; margin: 0;">${subheading}</p>
+            <button class="ppo-dismiss-btn" aria-label="Dismiss offer" style="flex: 0 0 auto; background: transparent; border: none; color: #6b7280; font-size: 24px; line-height: 1; cursor: pointer; padding: 2px 4px;">&times;</button>
           </div>
-          <button class="ppo-dismiss-btn" style="background: transparent; border: none; color: #9ca3af; font-size: 12px; cursor: pointer; padding: 4px 8px; text-decoration: underline;">No thanks, dismiss</button>
-        </div>
 
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
-          ${cardsHtml}
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
+            ${cardsHtml}
+          </div>
+          <button class="ppo-dismiss-link" style="display: block; margin: 18px auto 0; background: transparent; border: none; color: #6b7280; font-size: 12px; cursor: pointer; padding: 4px 8px; text-decoration: underline;">No thanks, dismiss</button>
         </div>
       </div>
     `;
 
-    // Attach event listeners safely
-    this.querySelector('.ppo-dismiss-btn')?.addEventListener('click', () => {
-      this.handleDismiss();
+    const overlay = this.querySelector('.ppo-overlay');
+    const dialog = this.querySelector('.ppo-dialog') as HTMLElement | null;
+    const dismiss = () => this.handleDismiss();
+
+    this.querySelector('.ppo-dismiss-btn')?.addEventListener('click', dismiss);
+    this.querySelector('.ppo-dismiss-link')?.addEventListener('click', dismiss);
+    overlay?.addEventListener('click', (event) => {
+      if (event.target === overlay) dismiss();
     });
+
+    this.escapeHandler = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') dismiss();
+    };
+    document.addEventListener('keydown', this.escapeHandler);
+    dialog?.focus();
 
     const claimButtons = this.querySelectorAll('.ppo-claim-btn');
     claimButtons.forEach((btn) => {
@@ -349,6 +333,13 @@ class PostPurchaseOffersElement extends HTMLElement {
         }
       });
     });
+  }
+
+  private removeEscapeHandler() {
+    if (this.escapeHandler) {
+      document.removeEventListener('keydown', this.escapeHandler);
+      this.escapeHandler = null;
+    }
   }
 }
 

@@ -12,7 +12,8 @@
     "release": "wix release",
     "generate": "wix generate",
     "skills": "wix skills",
-    "typecheck": "astro check"
+    "typecheck": "astro check",
+    "permissions:add": "node scripts/add-app-permissions.mjs"
   },
   "dependencies": {
     "@wix/astro": "^2.75.3",

@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=block" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .ed-top { height: 46px; background: #fff; border-bottom: 1px solid #e6e9ef; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; font-size: 13px; color: #000624; }
+  .ed-top .pg { border: 1px solid #dfe3ea; border-radius: 6px; padding: 6px 12px; }
+  .btn { display: inline-flex; align-items: center; height: 26px; padding: 0 14px; border-radius: 13px; font-size: 12px; font-weight: 500; }
+  .btn.pri { background: #116dff; color: #fff; }
+  .btn.sec { border: 1px solid #116dff; color: #116dff; }
+  .ed { display: flex; height: calc(100% - 80px); }
+  /* Real widget (shots/editor-widget.png, 900 x 860 at 1x) and real settings panel (shots/panel.png). */
+  /* Background matches the widget's dimmed backdrop so the screenshot's edge doesn't show. */
+  .canvas { flex: 1; overflow: hidden; background: #636974; }
+  .canvas img { display: block; width: 760px; margin: -120px 0 0 -10px; }
+  .panel { width: 300px; flex: 0 0 auto; border-left: 1px solid #e6e9ef; overflow: hidden; }
+  .panel img { display: block; width: 300px; }
+</style>
+</head>
+<body class="slide">
+  <header class="cap">
+    <h1>Make it match your brand</h1>
+    <p>Change the text, fonts, colors and button in the Wix Editor. No code needed.</p>
+  </header>
+  <div class="stage">
+    <div class="window">
+      <div class="chrome"><i></i><i></i><i></i><div class="url">editor.wix.com</div></div>
+      <div class="ed-top"><span class="pg">Page: Thank You Page ▾</span><span style="display:flex;gap:8px"><span class="btn sec">Preview</span><span class="btn pri">Publish</span></span></div>
+      <div class="ed">
+        <div class="canvas"><img src="../shots/editor-widget.png" alt=""></div>
+        <div class="panel"><img src="../shots/panel.png" alt=""></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { getCampaigns, createCampaign } from '../../../lib/wix/data';
 import type { Campaign } from '../../../lib/types';
+import { campaignFormSchema } from '../../../lib/validation/campaign';
 
 export const GET: APIRoute = async () => {
   try {
@@ -13,13 +14,20 @@ export const GET: APIRoute = async () => {
 
 export const POST: APIRoute = async ({ request }) => {
   try {
-    const body = (await request.json()) as Omit<Campaign, '_id'>;
-    if (!body.name || body.name.trim().length === 0) {
-      return Response.json({ error: 'Campaign name is required' }, { status: 400 });
+    const body = (await request.json()) as Partial<Omit<Campaign, '_id'>>;
+    const parsed = campaignFormSchema.safeParse({
+      name: body.name,
+      discount: body.discountValue,
+      minSubtotal: body.minOrderSubtotal,
+      mode: body.recommendationMode,
+    });
+
+    if (!parsed.success) {
+      return Response.json({ error: parsed.error.issues[0]?.message || 'Invalid campaign data' }, { status: 400 });
     }
 
     const created = await createCampaign({
-      name: body.name.trim(),
+      name: parsed.data.name,
       description: body.description || '',
       status: body.status || 'draft',
       priority: Number(body.priority || 1),
@@ -29,14 +37,14 @@ export const POST: APIRoute = async ({ request }) => {
       triggerCollectionIds: body.triggerCollectionIds || [],
       excludedProductIds: body.excludedProductIds || [],
       excludedCollectionIds: body.excludedCollectionIds || [],
-      minOrderSubtotal: Number(body.minOrderSubtotal || 0),
+      minOrderSubtotal: parsed.data.minSubtotal,
       maxOrderSubtotal: body.maxOrderSubtotal ? Number(body.maxOrderSubtotal) : undefined,
       currency: body.currency || 'USD',
-      recommendationMode: body.recommendationMode || 'AI',
+      recommendationMode: parsed.data.mode,
       maxOffers: Number(body.maxOffers || 2),
       fallbackMode: body.fallbackMode || 'RULES',
       discountType: body.discountType || 'PERCENTAGE',
-      discountValue: Number(body.discountValue || 10),
+      discountValue: parsed.data.discount,
       displayHeading: body.displayHeading,
       displaySubheading: body.displaySubheading,
       ctaText: body.ctaText || 'Claim Offer',

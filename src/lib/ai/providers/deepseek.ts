@@ -13,7 +13,7 @@ export class DeepSeekProvider implements RecommendationProvider {
   private baseUrl: string;
 
   constructor() {
-    this.apiKey = process.env.DEEPSEEK_API_KEY || '';
+    this.apiKey = process.env.DEEPSEEK_API || process.env.DEEPSEEK_API_KEY || '';
     this.model = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
     this.baseUrl = (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\/$/, '');
   }
@@ -24,7 +24,7 @@ export class DeepSeekProvider implements RecommendationProvider {
 
   public async recommend(input: RecommendationInput): Promise<RecommendationResult> {
     if (!this.isConfigured()) {
-      throw new Error('DEEPSEEK_API_KEY is not configured on the server');
+      throw new Error('DEEPSEEK_API is not configured on the server');
     }
 
     if (input.candidates.length === 0) {

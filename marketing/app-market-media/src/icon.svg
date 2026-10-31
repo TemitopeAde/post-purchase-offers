@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">
+  <!-- App icon: a completed-order bag with a sparkle for the smart follow-up offer. -->
+  <rect width="1000" height="1000" fill="#116dff"/>
+  <path d="M398 392v-52a102 102 0 0 1 204 0v52" fill="none" stroke="#fff" stroke-width="46" stroke-linecap="round"/>
+  <path d="M300 392h400a24 24 0 0 1 24 26l-26 342a40 40 0 0 1-40 37H342a40 40 0 0 1-40-37l-26-342a24 24 0 0 1 24-26z" fill="#fff"/>
+  <path d="M410 590l62 62 122-122" fill="none" stroke="#116dff" stroke-width="50" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M720 190c12 62 34 84 96 96-62 12-84 34-96 96-12-62-34-84-96-96 62-12 84-34 96-96z" fill="#ffc940"/>
+</svg>
