@@ -9,6 +9,24 @@ export interface ProductSearchPage {
   hasNext: boolean;
 }
 
+export interface ProductVariantChoice {
+  variantId: string;
+  choices: Record<string, string>;
+  price: number;
+  currency: string;
+  inStock: boolean;
+}
+
+export interface ProductVariantOptions {
+  name: string;
+  choices: string[];
+}
+
+export interface ProductVariantsResult {
+  options: ProductVariantOptions[];
+  variants: ProductVariantChoice[];
+}
+
 let cachedVersion: CatalogVersion | undefined;
 
 function getVariantId(variant: unknown): string | undefined {
@@ -238,4 +256,93 @@ export async function getProductDetails(productId: string): Promise<ProductCandi
     console.warn(`Error getting product details for ${productId}:`, err);
     return null;
   }
+}
+
+export async function getProductVariants(productId: string): Promise<ProductVariantsResult> {
+  const version = await getStoreCatalogVersion();
+
+  try {
+    if (version === 'V3_CATALOG') {
+      const product = await productsV3.getProduct(productId, {
+        fields: [
+          'VARIANT_OPTION_CHOICE_NAMES',
+          'CURRENCY',
+          'DIRECT_CATEGORIES_INFO',
+        ] as any,
+      });
+      const rawOptions = (product as any)?.options || [];
+      const options: ProductVariantOptions[] = rawOptions
+        .map((option: any) => ({
+          name: option.name || option.key || '',
+          choices: (option.choicesSettings?.choices || [])
+            .map((choice: any) => choice.name || choice.key || '')
+            .filter(Boolean),
+        }))
+        .filter((option: ProductVariantOptions) => option.name && option.choices.length > 0);
+
+      const variants = ((product as any)?.variantsInfo?.variants || [])
+        .map((variant: any): ProductVariantChoice | null => {
+          if (!variant?._id) return null;
+          const choices: Record<string, string> = {};
+          for (const choice of variant.choices || []) {
+            const named = choice.optionChoiceNames;
+            if (named?.optionName && named.choiceName) choices[named.optionName] = named.choiceName;
+          }
+          const price = Number(variant.price?.actualPrice?.amount || 0);
+          return {
+            variantId: variant._id,
+            choices,
+            price,
+            currency: (product as any)?.currency || 'USD',
+            inStock: variant.inventoryStatus?.inStock !== false,
+          };
+        })
+        .filter((variant: ProductVariantChoice | null): variant is ProductVariantChoice => Boolean(variant));
+
+      return { options, variants };
+    }
+
+    const response = await products.queryProductVariants(productId, { paging: { limit: 100 } });
+    const variants = (response.variants || [])
+      .map((item: any): ProductVariantChoice | null => {
+        const variantId = item._id || item.variant?._id;
+        if (!variantId) return null;
+        return {
+          variantId,
+          choices: item.choices || {},
+          price: Number(item.variant?.priceData?.discountedPrice || item.variant?.priceData?.price || 0),
+          currency: item.variant?.priceData?.currency || 'USD',
+          inStock: item.variant?.stock?.inventoryStatus !== 'OUT_OF_STOCK',
+        };
+      })
+      .filter((variant: ProductVariantChoice | null): variant is ProductVariantChoice => Boolean(variant));
+
+    const optionMap = new Map<string, Set<string>>();
+    variants.forEach((variant) => {
+      Object.entries(variant.choices).forEach(([name, value]) => {
+        if (!optionMap.has(name)) optionMap.set(name, new Set());
+        optionMap.get(name)?.add(value);
+      });
+    });
+    const options = Array.from(optionMap, ([name, values]) => ({ name, choices: Array.from(values) }));
+    return { options, variants };
+  } catch (err) {
+    console.warn(`Error getting variants for product ${productId}:`, err);
+    return { options: [], variants: [] };
+  }
+}
+
+export async function getProductVariantDetails(productId: string, variantId: string): Promise<ProductCandidate | null> {
+  const product = await getProductDetails(productId);
+  if (!product) return null;
+  const variants = await getProductVariants(productId);
+  const variant = variants.variants.find((item) => item.variantId === variantId);
+  if (!variant) return null;
+  return {
+    ...product,
+    variantId: variant.variantId,
+    price: variant.price,
+    currency: variant.currency,
+    inStock: variant.inStock,
+  };
 }

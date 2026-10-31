@@ -1,10 +1,16 @@
 import { window as wixWindow } from '@wix/site-window';
+import { currentCartV2 } from '@wix/ecom';
+import { ecom } from '@wix/site-ecom';
 import { httpClient } from '@wix/essentials';
 
 const fetchWithAuth = httpClient.fetchWithAuth || fetch;
 
 // Resolve API routes against the app server, not the host site origin.
 const apiUrl = (path: string) => new URL(path, import.meta.url).href;
+
+type VariantSelection = {
+  variantId: string;
+};
 
 class PostPurchaseOffersElement extends HTMLElement {
   static get observedAttributes() {
@@ -38,6 +44,14 @@ class PostPurchaseOffersElement extends HTMLElement {
   private isLoading = false;
   private isDismissed = false;
   private processingOfferId: string | null = null;
+  private addedOfferIds = new Set<string>();
+  private variantPicker: {
+    offer: any;
+    options: Array<{ name: string; choices: string[] }>;
+    variants: Array<{ variantId: string; choices: Record<string, string> }>;
+    selectedChoices: Record<string, string>;
+    resolve: (selection: VariantSelection | null) => void;
+  } | null = null;
   private hasFetched = false;
   private isInitializing = false;
   private escapeHandler: ((event: KeyboardEvent) => void) | null = null;
@@ -261,6 +275,9 @@ class PostPurchaseOffersElement extends HTMLElement {
       offerId,
     });
 
+    const selection = await this.getVariantSelection(offer);
+    if (!selection) return;
+
     this.processingOfferId = offerId;
     this.render();
 
@@ -272,7 +289,7 @@ class PostPurchaseOffersElement extends HTMLElement {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           productId: offer.productId,
-          variantId: offer.variantId,
+          variantId: selection.variantId,
           campaignId: this.offersData?.campaign?.id,
           offerId: offer._id,
           originalOrderId: orderId,
@@ -306,8 +323,126 @@ class PostPurchaseOffersElement extends HTMLElement {
     }
   }
 
+  private async handleAddToCart(offer: any) {
+    if (this.processingOfferId) return;
+
+    const offerId = this.getOfferKey(offer);
+    if (!offer?.productId || this.addedOfferIds.has(offerId)) return;
+
+    this.log('Add to cart clicked', {
+      hasProductId: Boolean(offer.productId),
+      hasVariantId: Boolean(offer.variantId),
+      offerId,
+    });
+    const selection = await this.getVariantSelection(offer);
+    if (!selection) return;
+
+    this.processingOfferId = offerId;
+    this.render();
+
+    try {
+      await currentCartV2.addLineItemsToCurrentCart({
+        catalogItems: [
+          {
+            catalogReference: {
+              catalogItemId: offer.productId,
+              appId: '215238eb-22a5-4c36-9e7b-e7c08025e04e',
+              options: { variantId: selection.variantId },
+            },
+            quantity: 1,
+          },
+        ],
+      });
+      // Wix's site-ecom module refreshes the cart icon/side cart and emits the
+      // cart-change event after a Current Cart API mutation.
+      await ecom.refreshCart();
+      this.addedOfferIds.add(offerId);
+      this.log('Offer added to current cart', { offerId });
+    } catch (err: any) {
+      console.error(`[PostPurchaseOffers] Add to cart failed ${this.formatLogDetails(err)}`);
+      alert(err?.message || 'Unable to add this item to your cart. Please try again.');
+    } finally {
+      this.processingOfferId = null;
+      this.render();
+    }
+  }
+
+  private async getVariantSelection(offer: any): Promise<VariantSelection | null> {
+    try {
+      const response = await fetchWithAuth(
+        apiUrl(`/api/product-variants?productId=${encodeURIComponent(String(offer.productId))}`),
+      );
+      if (!response.ok) throw new Error('Could not load product options');
+      const data = await response.json();
+      const variants = Array.isArray(data?.variants) ? data.variants : [];
+      const options = Array.isArray(data?.options) ? data.options : [];
+
+      if (variants.length === 0) {
+        throw new Error('No purchasable variant is available for this product');
+      }
+      if (options.length === 0) {
+        return { variantId: offer.variantId || variants[0].variantId };
+      }
+
+      return await new Promise<VariantSelection | null>((resolve) => {
+        this.variantPicker = {
+          offer,
+          options,
+          variants,
+          selectedChoices: {},
+          resolve,
+        };
+        this.render();
+      });
+    } catch (err: any) {
+      console.error(`[PostPurchaseOffers] Variant lookup failed ${this.formatLogDetails(err)}`);
+      alert(err?.message || 'Unable to load this product’s options. Please try again.');
+      return null;
+    }
+  }
+
+  private cancelVariantSelection() {
+    const picker = this.variantPicker;
+    if (!picker) return;
+    this.variantPicker = null;
+    picker.resolve(null);
+    this.render();
+  }
+
+  private confirmVariantSelection() {
+    const picker = this.variantPicker;
+    if (!picker) return;
+
+    const hasAllChoices = picker.options.every((option) => Boolean(picker.selectedChoices[option.name]));
+    if (!hasAllChoices) {
+      alert('Please select an option for this product.');
+      return;
+    }
+
+    const selectedVariant = picker.variants.find((variant) =>
+      picker.options.every((option) => variant.choices[option.name] === picker.selectedChoices[option.name]),
+    );
+    if (!selectedVariant) {
+      alert('That combination is unavailable. Please choose another option.');
+      return;
+    }
+
+    this.variantPicker = null;
+    picker.resolve({ variantId: selectedVariant.variantId });
+    this.render();
+  }
+
   private getOfferKey(offer: any): string {
     return String(offer?._id || offer?.productId || 'unknown-offer');
+  }
+
+  private escapeHtml(value: unknown): string {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 
   render() {
@@ -381,6 +516,7 @@ class PostPurchaseOffersElement extends HTMLElement {
       .map((offer: any, idx: number) => {
         const offerId = this.getOfferKey(offer);
         const isOfferProcessing = this.processingOfferId === offerId;
+        const isOfferAdded = this.addedOfferIds.has(offerId);
         const hasDiscount = offer.regularPrice > offer.offerPrice;
         const discountBadge =
           offer.badge ||
@@ -430,23 +566,55 @@ class PostPurchaseOffersElement extends HTMLElement {
                 }
               </div>
 
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+              <button class="ppo-add-cart-btn" data-index="${idx}" style="width: 100%; background: transparent; color: ${buttonColor}; ${buttonFont ? `font: ${buttonFont};` : 'font-size: 14px; font-weight: 600;'} border: 1px solid ${buttonColor}; border-radius: ${Math.max(
+                4,
+                borderRadius - 2
+              )}px; padding: 10px 16px; cursor: pointer; transition: opacity 0.15s ease; display: flex; align-items: center; justify-content: center; gap: 6px;" ${
+                isOfferProcessing || isOfferAdded ? 'disabled' : ''
+              }>
+                ${
+                  isOfferAdded ? 'Added to Cart ✓' : isOfferProcessing ? 'Adding to Cart...' : 'Add to Cart'
+                }
+              </button>
               <button class="ppo-claim-btn" data-index="${idx}" style="width: 100%; background: ${buttonColor}; color: ${buttonTextColor}; ${buttonFont ? `font: ${buttonFont};` : 'font-size: 14px; font-weight: 600;'} border: none; border-radius: ${Math.max(
                 4,
                 borderRadius - 2
               )}px; padding: 10px 16px; cursor: pointer; transition: opacity 0.15s ease; display: flex; align-items: center; justify-content: center; gap: 6px;" ${
                 isOfferProcessing ? 'disabled' : ''
               }>
-                ${
-                  isOfferProcessing
-                    ? `<span style="display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite;"></span> Redirecting to Checkout...`
-                    : `${ctaText} →`
-                }
+                ${isOfferProcessing ? 'Redirecting to Checkout...' : `${ctaText} →`}
               </button>
+              </div>
             </div>
           </div>
         `;
       })
       .join('');
+
+    const variantPickerHtml = this.variantPicker
+      ? `
+        <div class="ppo-variant-backdrop" style="position: fixed; inset: 0; z-index: 2147483648; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(17, 24, 39, 0.62);">
+          <div class="ppo-variant-dialog" role="dialog" aria-modal="true" aria-labelledby="ppo-variant-heading" style="width: min(420px, 100%); background: #fff; border-radius: ${borderRadius}px; padding: 22px; box-shadow: 0 24px 80px rgba(0,0,0,0.24); font-family: Arial, sans-serif;">
+            <h3 id="ppo-variant-heading" style="margin: 0 0 6px; color: ${headingColor}; font-size: 18px;">Choose options</h3>
+            <p style="margin: 0 0 18px; color: #6b7280; font-size: 13px;">${this.escapeHtml(this.variantPicker.offer.productName)}</p>
+            ${this.variantPicker.options.map((option) => `
+              <label style="display: block; margin-bottom: 14px; color: ${productTitleColor}; font-size: 13px; font-weight: 600;">
+                ${this.escapeHtml(option.name)}
+                <select class="ppo-variant-select" data-option-name="${this.escapeHtml(option.name)}" style="display: block; width: 100%; margin-top: 6px; padding: 9px; border: 1px solid #d1d5db; border-radius: 4px; background: #fff; color: #111827;">
+                  <option value="">Choose ${this.escapeHtml(option.name)}</option>
+                  ${option.choices.map((choice) => `<option value="${this.escapeHtml(choice)}" ${this.variantPicker?.selectedChoices[option.name] === choice ? 'selected' : ''}>${this.escapeHtml(choice)}</option>`).join('')}
+                </select>
+              </label>
+            `).join('')}
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px;">
+              <button class="ppo-variant-cancel" style="background: transparent; border: 1px solid #d1d5db; color: #374151; border-radius: 4px; padding: 9px 14px; cursor: pointer;">Cancel</button>
+              <button class="ppo-variant-confirm" style="background: ${buttonColor}; color: ${buttonTextColor}; border: none; border-radius: 4px; padding: 9px 14px; cursor: pointer;">Continue</button>
+            </div>
+          </div>
+        </div>
+      `
+      : '';
 
     this.innerHTML = `
       <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
@@ -468,6 +636,7 @@ class PostPurchaseOffersElement extends HTMLElement {
           <button class="ppo-dismiss-link" style="display: block; margin: 18px auto 0; background: transparent; border: none; color: #6b7280; font-size: 12px; cursor: pointer; padding: 4px 8px; text-decoration: underline;">No thanks, dismiss</button>
         </div>
       </div>
+      ${variantPickerHtml}
     `;
 
     const overlay = this.querySelector('.ppo-overlay');
@@ -495,6 +664,27 @@ class PostPurchaseOffersElement extends HTMLElement {
         if (offer) {
           this.handleClaimOffer(offer);
         }
+      });
+    });
+
+    const addCartButtons = this.querySelectorAll('.ppo-add-cart-btn');
+    addCartButtons.forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLElement;
+        const idx = parseInt(target.getAttribute('data-index') || '0', 10);
+        const offer = offers[idx];
+        if (offer) void this.handleAddToCart(offer);
+      });
+    });
+
+    this.querySelector('.ppo-variant-cancel')?.addEventListener('click', () => this.cancelVariantSelection());
+    this.querySelector('.ppo-variant-confirm')?.addEventListener('click', () => this.confirmVariantSelection());
+    this.querySelectorAll('.ppo-variant-select').forEach((select) => {
+      select.addEventListener('change', (event) => {
+        if (!this.variantPicker) return;
+        const target = event.currentTarget as HTMLSelectElement;
+        const optionName = target.getAttribute('data-option-name');
+        if (optionName) this.variantPicker.selectedChoices[optionName] = target.value;
       });
     });
   }

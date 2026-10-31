@@ -1,6 +1,6 @@
 import { cartV2 } from '@wix/ecom';
 import { auth } from '@wix/essentials';
-import { getProductDetails } from './catalog';
+import { getProductDetails, getProductVariantDetails } from './catalog';
 import { getCampaignById } from './data';
 import { calculateOfferPrice } from '../recommendations/ranking';
 
@@ -27,7 +27,9 @@ export async function createOfferCheckout(options: {
   }
 
   // 1. Authoritative verification of product availability
-  const product = await getProductDetails(productId);
+  const product = options.variantId
+    ? await getProductVariantDetails(productId, options.variantId)
+    : await getProductDetails(productId);
   if (!product) {
     return { success: false, error: 'Product not found in store catalog' };
   }
