@@ -1,3 +1,4 @@
+import { window as wixWindow } from '@wix/site-window';
 import { httpClient } from '@wix/essentials';
 
 const fetchWithAuth = httpClient.fetchWithAuth || fetch;
@@ -36,29 +37,133 @@ class PostPurchaseOffersElement extends HTMLElement {
   private offersData: any = null;
   private isLoading = false;
   private isDismissed = false;
-  private isProcessingCheckout = false;
+  private processingOfferId: string | null = null;
   private hasFetched = false;
+  private isInitializing = false;
   private escapeHandler: ((event: KeyboardEvent) => void) | null = null;
 
   constructor() {
     super();
   }
 
+  private formatLogDetails(details: unknown): string {
+    if (details instanceof Error) return details.message;
+    if (typeof details === 'string') return details;
+
+    try {
+      return JSON.stringify(details);
+    } catch {
+      return String(details);
+    }
+  }
+
+  private log(message: string, details?: unknown) {
+    const suffix = details === undefined ? '' : ` ${this.formatLogDetails(details)}`;
+    console.info(`[PostPurchaseOffers] ${message}${suffix}`);
+  }
+
+  private async isEditorMode(): Promise<boolean> {
+    try {
+      const mode = await wixWindow.viewMode();
+      const isEditor = mode === 'Editor' || mode === 'Preview';
+      this.log('Wix view mode detected', { mode, isEditor });
+      return isEditor;
+    } catch (error) {
+      console.warn(`[PostPurchaseOffers] Could not detect Wix view mode ${this.formatLogDetails(error)}`);
+      return false;
+    }
+  }
+
+  private loadEditorPreview() {
+    this.log('Loading editor preview data');
+    this.offersData = {
+      campaign: {
+        id: 'preview-campaign',
+        name: 'Post-Purchase Deals',
+        heading: this.getAttribute('heading') || 'A little something extra for you',
+        subheading:
+          this.getAttribute('subheading') ||
+          'Special offer selected exclusively for your recent order.',
+        ctaText: this.getAttribute('cta-text') || 'Claim Offer',
+      },
+      offers: [
+        {
+          _id: 'preview-offer-1',
+          productId: 'preview-product-1',
+          productName: 'Fast Charging Power Adapter & Braided Cable',
+          productImageUrl:
+            'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=400&q=80',
+          regularPrice: 29.99,
+          offerPrice: 22.49,
+          discountType: 'PERCENTAGE',
+          discountValue: 25,
+          badge: '25% OFF',
+          reason: 'High-speed charger matches perfectly with your recent purchase.',
+        },
+      ],
+      source: 'preview',
+    };
+  }
+
   async connectedCallback() {
-    await this.init();
+    this.log('Plugin mounted', {
+      hasOrderId: Boolean(this.getAttribute('order-id')),
+      hostTag: this.tagName.toLowerCase(),
+    });
+    await this.startInit();
   }
 
   attributeChangedCallback(name: string, oldValue: string, newValue: string) {
+    if (name === 'order-id') {
+      this.log('order-id attribute changed', {
+        hadOrderId: Boolean(oldValue),
+        hasOrderId: Boolean(newValue),
+        hasFetched: this.hasFetched,
+      });
+
+      // Wix can attach host props immediately after the element mounts. Retry
+      // when the order ID arrives instead of keeping the initial empty state.
+      if (newValue && newValue !== oldValue) {
+        this.hasFetched = false;
+        void this.startInit();
+      }
+    }
     if (oldValue !== newValue && this.hasFetched) {
       this.render();
     }
   }
 
+  private async startInit() {
+    if (this.isInitializing) return;
+    this.isInitializing = true;
+    try {
+      await this.init();
+    } finally {
+      this.isInitializing = false;
+    }
+  }
+
   private async init() {
+    const isEditor = await this.isEditorMode();
+    // Read the prop after the async view-mode check because Wix may attach
+    // order-id after connectedCallback has already fired.
     const orderId = this.getAttribute('order-id');
+    this.log('Initializing plugin', {
+      hasOrderId: Boolean(orderId),
+      isEditor,
+      apiUrl: apiUrl('/api/recommendations'),
+    });
+
+    if (isEditor && !orderId) {
+      this.loadEditorPreview();
+      this.hasFetched = true;
+      this.render();
+      return;
+    }
 
     if (!orderId) {
       // Do not render an offer without a real completed order.
+      this.log('No order-id found; rendering empty state');
       this.offersData = null;
       this.hasFetched = true;
       this.render();
@@ -67,6 +172,7 @@ class PostPurchaseOffersElement extends HTMLElement {
 
     // Live storefront with real order ID
     this.isLoading = true;
+    this.log('Fetching recommendations');
     this.render();
 
     try {
@@ -78,28 +184,48 @@ class PostPurchaseOffersElement extends HTMLElement {
           sessionKey: `sess_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
         }),
       });
+      this.log('Recommendations response received', {
+        ok: response.ok,
+        status: response.status,
+        contentType: response.headers.get('content-type'),
+      });
 
       if (response.ok) {
         const data = await response.json();
+        this.log('Recommendations payload received', {
+          hasCampaign: Boolean(data?.campaign),
+          offerCount: Array.isArray(data?.offers) ? data.offers.length : 0,
+          source: data?.source,
+        });
         if (data && data.offers && data.offers.length > 0) {
           this.offersData = data;
         } else {
+          this.log('Recommendations returned no offers');
           this.offersData = null;
         }
       } else {
+        const errorText = await response.text().catch(() => 'Unable to read error response');
+        this.log('Recommendations request failed', `status=${response.status} body=${errorText.slice(0, 500)}`);
         this.offersData = null;
       }
     } catch (err) {
-      console.warn('Post-purchase offers fetch error:', err);
+      console.error(`[PostPurchaseOffers] Recommendations request threw an error ${this.formatLogDetails(err)}`);
       this.offersData = null;
     } finally {
       this.isLoading = false;
       this.hasFetched = true;
+      this.log('Recommendation request finished', {
+        hasOffers: Boolean(this.offersData?.offers?.length),
+      });
       this.render();
     }
   }
 
   private handleDismiss() {
+    this.log('Offer dismissed', {
+      hasCampaign: Boolean(this.offersData?.campaign?.id),
+      offerCount: this.offersData?.offers?.length || 0,
+    });
     this.isDismissed = true;
     this.render();
 
@@ -114,14 +240,28 @@ class PostPurchaseOffersElement extends HTMLElement {
           originalOrderId: orderId,
           eventType: 'dismiss',
         }),
-      }).catch(() => {});
+      }).catch((err) => {
+        console.warn(`[PostPurchaseOffers] Dismiss event failed ${this.formatLogDetails(err)}`);
+      });
     }
   }
 
   private async handleClaimOffer(offer: any) {
-    if (this.isProcessingCheckout) return;
+    if (this.processingOfferId) {
+      this.log('Ignoring duplicate claim click while checkout is processing');
+      return;
+    }
 
-    this.isProcessingCheckout = true;
+    const offerId = this.getOfferKey(offer);
+
+    this.log('Claim offer clicked', {
+      hasProductId: Boolean(offer?.productId),
+      hasVariantId: Boolean(offer?.variantId),
+      offerPrice: offer?.offerPrice,
+      offerId,
+    });
+
+    this.processingOfferId = offerId;
     this.render();
 
     const orderId = this.getAttribute('order-id');
@@ -139,35 +279,48 @@ class PostPurchaseOffersElement extends HTMLElement {
           offerPrice: offer.offerPrice,
         }),
       });
+      this.log('Checkout response received', {
+        ok: response.ok,
+        status: response.status,
+        contentType: response.headers.get('content-type'),
+      });
 
       if (!response.ok) {
-        const err = await response.json();
+        const err = await response.json().catch(() => ({}));
         throw new Error(err?.error || 'Checkout initiation failed');
       }
 
       const data = await response.json();
       if (data.checkoutUrl) {
+        this.log('Checkout URL received; redirecting');
         // Redirect to Wix Checkout for the additional order
         window.location.href = data.checkoutUrl;
         return;
       }
       throw new Error('No checkout URL returned');
     } catch (err: any) {
+      console.error(`[PostPurchaseOffers] Checkout request failed ${this.formatLogDetails(err)}`);
       alert(err.message || 'Unable to add offer to checkout. Please try again.');
-      this.isProcessingCheckout = false;
+      this.processingOfferId = null;
       this.render();
     }
+  }
+
+  private getOfferKey(offer: any): string {
+    return String(offer?._id || offer?.productId || 'unknown-offer');
   }
 
   render() {
     this.removeEscapeHandler();
 
     if (this.isDismissed) {
+      this.log('Render skipped because offer was dismissed');
       this.innerHTML = '';
       return;
     }
 
     if (this.isLoading) {
+      this.log('Rendering loading state');
       this.innerHTML = `
         <div style="font-family: Arial, sans-serif; text-align: center; padding: 24px; color: #666;">
           <div style="display: inline-block; width: 24px; height: 24px; border: 2px solid #ddd; border-top-color: #3899ec; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
@@ -179,11 +332,19 @@ class PostPurchaseOffersElement extends HTMLElement {
     }
 
     if (!this.offersData || !this.offersData.offers || this.offersData.offers.length === 0) {
+      this.log('Rendering empty state', {
+        hasOffersData: Boolean(this.offersData),
+      });
       this.innerHTML = '';
       return;
     }
 
     const { campaign, offers, source } = this.offersData;
+    this.log('Rendering offer popup', {
+      campaignId: campaign?.id,
+      offerCount: offers.length,
+      source,
+    });
     const heading = this.getAttribute('heading') || campaign.heading || 'A little something extra for you';
     const headingColor = this.getAttribute('heading-color') || '#111827';
     const headingFont = this.getAttribute('heading-font') || '';
@@ -218,6 +379,8 @@ class PostPurchaseOffersElement extends HTMLElement {
 
     const cardsHtml = offers
       .map((offer: any, idx: number) => {
+        const offerId = this.getOfferKey(offer);
+        const isOfferProcessing = this.processingOfferId === offerId;
         const hasDiscount = offer.regularPrice > offer.offerPrice;
         const discountBadge =
           offer.badge ||
@@ -271,10 +434,10 @@ class PostPurchaseOffersElement extends HTMLElement {
                 4,
                 borderRadius - 2
               )}px; padding: 10px 16px; cursor: pointer; transition: opacity 0.15s ease; display: flex; align-items: center; justify-content: center; gap: 6px;" ${
-                this.isProcessingCheckout ? 'disabled' : ''
+                isOfferProcessing ? 'disabled' : ''
               }>
                 ${
-                  this.isProcessingCheckout
+                  isOfferProcessing
                     ? `<span style="display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite;"></span> Redirecting to Checkout...`
                     : `${ctaText} →`
                 }
@@ -286,6 +449,7 @@ class PostPurchaseOffersElement extends HTMLElement {
       .join('');
 
     this.innerHTML = `
+      <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
       <div class="ppo-overlay" role="presentation" style="position: fixed; inset: 0; z-index: 2147483647; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(17, 24, 39, 0.62); font-family: Arial, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; box-sizing: border-box;">
         <div class="ppo-dialog" role="dialog" aria-modal="true" aria-labelledby="ppo-heading" tabindex="-1" style="position: relative; width: min(720px, 100%); max-height: min(760px, calc(100vh - 40px)); overflow: auto; background: ${containerBgColor}; border: 1px solid #e5e7eb; border-radius: ${borderRadius}px; padding: 24px; box-shadow: 0 24px 80px rgba(0,0,0,0.24); box-sizing: border-box;">
           <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px;">

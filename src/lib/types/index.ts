@@ -62,6 +62,7 @@ export type EventType =
   | 'impression'
   | 'click'
   | 'dismiss'
+  | 'recommendation_request'
   | 'checkout_started'
   | 'purchase_confirmed';
 
@@ -100,8 +101,32 @@ export interface AppSettings {
   monthlyAiUsage: number;
 }
 
+export interface BillingStatus {
+  /** Plan name from Wix billing, or the stored plan when Wix billing is unavailable. */
+  plan: string;
+  isFree: boolean;
+  billingCycle?: string;
+  /** ISO date the current paid period ends. */
+  expirationDate?: string | null;
+  autoRenewing?: boolean | null;
+  freeTrial?: { status: 'IN_PROGRESS' | 'ENDED' | 'NOT_AVAILABLE'; endDate?: string | null };
+  monthlyUsage: number;
+  monthlyAllowance: number;
+  /** Wix pricing page for this site's app instance; open in a new tab. */
+  upgradeUrl?: string;
+  /** False when the Wix app instance couldn't be read and plan details came from app settings. */
+  fromWixBilling: boolean;
+  entitlements: {
+    unlimitedCampaigns: boolean;
+    advancedTargeting: boolean;
+    smartRanking: boolean;
+    analyticsExport: boolean;
+  };
+}
+
 export interface ProductCandidate {
   productId: string;
+  variantId?: string;
   name: string;
   description?: string;
   category?: string;

@@ -64,8 +64,28 @@ export const settings = {
 
 export const billing = {
   plan: 'Pro',
-  monthlyAllowance: 500,
+  isFree: false,
+  billingCycle: 'MONTHLY',
+  expirationDate: '2026-12-01T00:00:00.000Z',
+  autoRenewing: true,
   monthlyUsage: 212,
+  monthlyAllowance: 500,
+  upgradeUrl: 'https://www.wix.com/apps/upgrade/app?appInstanceId=demo',
+  fromWixBilling: true,
+  entitlements: { unlimitedCampaigns: true, advancedTargeting: true, smartRanking: true, analyticsExport: true },
+};
+
+// A store on the free plan, mid-trial and close to its request allowance (?billing=free).
+export const billingFree = {
+  ...billing,
+  plan: 'Free',
+  isFree: true,
+  billingCycle: undefined,
+  expirationDate: null,
+  autoRenewing: null,
+  freeTrial: { status: 'IN_PROGRESS', endDate: '2026-11-14T00:00:00.000Z' },
+  monthlyUsage: 431,
+  entitlements: { unlimitedCampaigns: false, advancedTargeting: false, smartRanking: true, analyticsExport: false },
 };
 
 export const recommendations = {

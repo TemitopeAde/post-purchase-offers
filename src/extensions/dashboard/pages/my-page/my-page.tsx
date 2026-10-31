@@ -22,7 +22,8 @@ import { Add, Delete, Check, Refresh } from '@wix/wix-ui-icons-common/lazy';
 import { httpClient } from '@wix/essentials';
 import { Toaster, toast } from 'sonner';
 import { BusinessManagerTheme } from '../../BusinessManagerTheme';
-import type { Campaign, AppSettings } from '../../../../lib/types';
+import type { Campaign, AppSettings, BillingStatus } from '../../../../lib/types';
+import { BillingTab } from './BillingTab';
 import type { DashboardOverviewMetrics } from '../../../../lib/analytics';
 import { campaignFormSchema, type CampaignFormValues } from '../../../../lib/validation/campaign';
 
@@ -35,7 +36,7 @@ export const PostPurchaseDashboard: FC = () => {
   const [overviewMetrics, setOverviewMetrics] = useState<DashboardOverviewMetrics | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [billing, setBilling] = useState<any>(null);
+  const [billing, setBilling] = useState<BillingStatus | null>(null);
 
   // New campaign modal form state
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -52,6 +53,7 @@ export const PostPurchaseDashboard: FC = () => {
         fetchWithAuth('/api/dashboard/overview').then((r) => r.json()),
         fetchWithAuth('/api/campaigns').then((r) => r.json()),
         fetchWithAuth('/api/settings').then((r) => r.json()),
+        // Includes the Wix app instance's billing details.
         fetchWithAuth('/api/billing').then((r) => r.json()),
       ]);
       setOverviewMetrics(metricsRes);
@@ -63,6 +65,29 @@ export const PostPurchaseDashboard: FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const refreshTab = async (tabId: string) => {
+    try {
+      if (tabId === 'overview') {
+        setOverviewMetrics(await fetchWithAuth('/api/dashboard/overview').then((r) => r.json()));
+      } else if (tabId === 'campaigns') {
+        const response = await fetchWithAuth('/api/campaigns');
+        const data = await response.json();
+        setCampaigns(Array.isArray(data) ? data : []);
+      } else if (tabId === 'ai' || tabId === 'storefront') {
+        setSettings(await fetchWithAuth('/api/settings').then((r) => r.json()));
+      } else if (tabId === 'billing') {
+        setBilling(await fetchWithAuth('/api/billing').then((r) => r.json()));
+      }
+    } catch (err) {
+      console.error(`Error refreshing ${tabId} tab:`, err);
+    }
+  };
+
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+    void refreshTab(tabId);
   };
 
   useEffect(() => {
@@ -193,7 +218,7 @@ export const PostPurchaseDashboard: FC = () => {
           <Box direction="vertical" gap="SP4">
             <Tabs
               activeId={activeTab}
-              onClick={(tab) => setActiveTab(tab.id as string)}
+              onClick={(tab) => handleTabChange(tab.id as string)}
               items={[
                 { id: 'overview', title: 'Overview' },
                 { id: 'campaigns', title: 'Campaigns' },
@@ -664,46 +689,7 @@ export const PostPurchaseDashboard: FC = () => {
             )}
 
             {/* BILLING & PLAN TAB */}
-            {!loading && activeTab === 'billing' && (
-              <Box direction="vertical" gap="SP4">
-                <Card>
-                  <Card.Header
-                    title="Subscription & Entitlements"
-                    subtitle="Wix App Market billing status"
-                    suffix={<Badge skin="success">{billing?.plan || 'Pro'}</Badge>}
-                  />
-                  <Card.Content>
-                    <Box direction="vertical" gap="SP3">
-                      <Box gap="SP4">
-                        <Box style={{ flex: 1 }}>
-                          <Text weight="bold">Current Plan</Text>
-                          <Heading size="small">{billing?.plan || 'Pro'}</Heading>
-                          <Text size="small" secondary>Full access to smart recommendations and unlimited campaigns</Text>
-                        </Box>
-                        <Box style={{ flex: 1 }}>
-                          <Text weight="bold">Monthly Requests</Text>
-                          <Heading size="small">{billing?.monthlyUsage || 12} / {billing?.monthlyAllowance || 500}</Heading>
-                          <Text size="small" secondary>Resets on the 1st of every month</Text>
-                        </Box>
-                      </Box>
-                      <Divider />
-                      <Box gap="SP2" align="center">
-                        <Check />
-                        <Text size="small">Smart ranking engine activated</Text>
-                      </Box>
-                      <Box gap="SP2" align="center">
-                        <Check />
-                        <Text size="small">Automatic Wix Cart V2 & Checkout creation</Text>
-                      </Box>
-                      <Box gap="SP2" align="center">
-                        <Check />
-                        <Text size="small">Stores Catalog V1 & V3 dual compatibility</Text>
-                      </Box>
-                    </Box>
-                  </Card.Content>
-                </Card>
-              </Box>
-            )}
+            {!loading && activeTab === 'billing' && <BillingTab billing={billing} />}
           </Box>
         </Page.Content>
         </Page>

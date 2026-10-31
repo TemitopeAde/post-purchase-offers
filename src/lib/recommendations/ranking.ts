@@ -68,6 +68,7 @@ export function rankCandidatesDeterministically(
     return {
       campaignId: campaign._id || '',
       productId: candidate.productId,
+      variantId: candidate.variantId,
       productName: candidate.name,
       productImageUrl: candidate.imageUrl,
       regularPrice: candidate.price,
@@ -104,6 +105,7 @@ export function mergeAiRankingsWithOffers(
     offers.push({
       campaignId: campaign._id || '',
       productId: product.productId,
+      variantId: product.variantId,
       productName: product.name,
       productImageUrl: product.imageUrl,
       regularPrice: product.price,

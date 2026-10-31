@@ -1,5 +1,5 @@
 import type { Campaign, Offer, ProductCandidate } from '../types';
-import { getCampaigns, getOffersByCampaign, getAppSettings } from '../wix/data';
+import { getCampaigns, getOffersByCampaign, getAppSettings, recordOfferEvent } from '../wix/data';
 import { getProductCandidates } from '../wix/catalog';
 import { getOrderContext, type OrderContext } from '../wix/orders';
 import { defaultDeepSeekProvider } from '../ai/providers/deepseek';
@@ -104,6 +104,15 @@ export async function generateOffersForOrder(
 
   if (shouldTryAi && finalOffers.length < maxOffers) {
     try {
+      await recordOfferEvent({
+        campaignId: campaign._id || 'unknown',
+        productId: '__ai_recommendation_request__',
+        originalOrderId: order.orderId,
+        eventType: 'recommendation_request',
+        sessionKey: `ai_${order.orderId}_${Date.now()}`,
+        aiRecommended: true,
+      });
+
       const aiResult = await defaultDeepSeekProvider.recommend({
         currency: order.currency,
         purchasedProducts: order.purchasedProducts,

@@ -5,6 +5,17 @@ export type CatalogVersion = 'V1_CATALOG' | 'V3_CATALOG' | 'STORES_NOT_INSTALLED
 
 let cachedVersion: CatalogVersion | undefined;
 
+function getVariantId(variant: unknown): string | undefined {
+  if (!variant || typeof variant !== 'object') return undefined;
+
+  const value = variant as Record<string, unknown>;
+  const sdkId = value._id;
+  if (typeof sdkId === 'string' && sdkId) return sdkId;
+
+  const runtimeId = value.id;
+  return typeof runtimeId === 'string' && runtimeId ? runtimeId : undefined;
+}
+
 export async function getStoreCatalogVersion(): Promise<CatalogVersion> {
   if (cachedVersion) return cachedVersion;
   try {
@@ -50,29 +61,16 @@ export async function getProductCandidates(options: {
         .limit(limit)
         .find();
 
-      for (const item of response.items || []) {
-        if (!item._id || excludeSet.has(item._id)) continue;
+      // Query Products does not return variant data. Resolve each product with
+      // Get Product so recommendations carry the authoritative price and
+      // variant ID required by Catalog V3 checkout.
+      const productIds = (response.items || [])
+        .map((item) => item._id)
+        .filter((productId): productId is string => Boolean(productId && !excludeSet.has(productId)));
 
-        const main = item.media?.main;
-        const imageUrl =
-          toBrowserImageUrl(main?.image) ||
-          toBrowserImageUrl(main?.thumbnail?.url) ||
-          toBrowserImageUrl(main?.url);
-
-        const primaryVariant = item.variantsInfo?.variants?.[0];
-        const priceAmount = Number(primaryVariant?.price?.actualPrice?.amount || 0);
-        const desc = typeof item.description === 'string' ? item.description : '';
-
-        candidates.push({
-          productId: item._id,
-          name: item.name || 'Store Product',
-          description: desc,
-          category: item.directCategoriesInfo?.categories?.[0]?._id,
-          price: priceAmount,
-          currency: item.currency || 'USD',
-          imageUrl,
-          inStock: item.inventory?.availabilityStatus !== 'OUT_OF_STOCK',
-        });
+      const productDetails = await Promise.all(productIds.map((productId) => getProductDetails(productId)));
+      for (const product of productDetails) {
+        if (product && product.price > 0) candidates.push(product);
       }
     } else {
       // V1 Catalog
@@ -119,11 +117,14 @@ export async function getProductDetails(productId: string): Promise<ProductCandi
         toBrowserImageUrl(main?.url);
 
       const primaryVariant = product.variantsInfo?.variants?.[0];
-      const priceAmount = Number(primaryVariant?.price?.actualPrice?.amount || 0);
+      const priceAmount = Number(
+        primaryVariant?.price?.actualPrice?.amount ?? product.actualPriceRange?.minValue?.amount ?? 0
+      );
       const desc = typeof product.description === 'string' ? product.description : '';
 
       return {
         productId: product._id,
+        variantId: getVariantId(primaryVariant),
         name: product.name || 'Product',
         description: desc,
         category: product.directCategoriesInfo?.categories?.[0]?._id,

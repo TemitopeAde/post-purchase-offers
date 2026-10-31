@@ -28,34 +28,13 @@ let memorySettings: AppSettings = {
   enableAiExplanations: true,
   plan: 'Pro',
   monthlyAiAllowance: 500,
-  monthlyAiUsage: 12,
+  monthlyAiUsage: 0,
 };
 
-// Seed default initial campaign if empty
-function ensureDefaultData() {
-  if (memoryCampaigns.size === 0) {
-    const defaultCamp: Campaign = {
-      _id: 'default-active-campaign',
-      name: 'Default Complementary Upsell',
-      description: 'Automatically recommend matching accessories and complementary products',
-      status: 'active',
-      priority: 10,
-      minOrderSubtotal: 0,
-      currency: 'USD',
-      recommendationMode: 'AI',
-      maxOffers: 2,
-      fallbackMode: 'RULES',
-      discountType: 'PERCENTAGE',
-      discountValue: 15,
-      displayHeading: 'A little something extra for you',
-      displaySubheading: 'Special 15% discount on these complementary items!',
-      ctaText: 'Add to Order',
-      _createdDate: new Date().toISOString(),
-    };
-    memoryCampaigns.set(defaultCamp._id!, defaultCamp);
-  }
-}
-ensureDefaultData();
+const getStartOfCurrentMonth = () => {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+};
 
 // --- Campaigns CRUD ---
 export async function getCampaigns(): Promise<Campaign[]> {
@@ -190,17 +169,36 @@ export async function getOfferEvents(): Promise<OfferEvent[]> {
   return [...memoryEvents];
 }
 
+export async function getMonthlyAiUsage(): Promise<number> {
+  const startOfMonth = getStartOfCurrentMonth();
+
+  try {
+    const res = await items
+      .query(COLLECTIONS.OFFER_EVENTS)
+      .eq('eventType', 'recommendation_request')
+      .ge('_createdDate', startOfMonth)
+      .limit(1000)
+      .find();
+    return res.items?.length || 0;
+  } catch (err) {
+    return memoryEvents.filter(
+      (event) => event.eventType === 'recommendation_request' && (event._createdDate || '') >= startOfMonth,
+    ).length;
+  }
+}
+
 // --- App Settings ---
 export async function getAppSettings(): Promise<AppSettings> {
   try {
     const res = await items.query(COLLECTIONS.APP_SETTINGS).limit(1).find();
     if (res.items && res.items.length > 0) {
-      return res.items[0] as unknown as AppSettings;
+      const settings = res.items[0] as unknown as AppSettings;
+      return { ...settings, monthlyAiUsage: await getMonthlyAiUsage() };
     }
   } catch (err) {
     // fallback
   }
-  return { ...memorySettings };
+  return { ...memorySettings, monthlyAiUsage: await getMonthlyAiUsage() };
 }
 
 export async function updateAppSettings(updates: Partial<AppSettings>): Promise<AppSettings> {

@@ -19,10 +19,15 @@ const PERMISSIONS = [
   'SCOPE.DC-STORES.READ-ORDERS',
   // @wix/ecom cartV2.createCart
   'SCOPE.ECOM.WRITE-CARTS-V2_LIMITED',
+  // @wix/ecom cartV2.createCart with catalogOverrideFields (offer price);
+  // Wix requires ECOM.ADMIN_MODIFY_CHECKOUTS for price overrides.
+  'SCOPE.ECOM.MANAGE-ADMIN',
   // @wix/ecom cartV2.getCheckoutUrl
   'SCOPE.ECOM.READ-CARTS-V2_LIMITED',
   // @wix/stores catalogVersioning.getCatalogVersion
   'SCOPE.STORES.CATALOG_READ_LIMITED',
+  // Get App Instance endpoint
+  'SCOPE.DC.MANAGE-YOUR-APP',
   // @wix/stores products.queryProducts / getProduct (Catalog V1)
   'SCOPE.DC-STORES.READ-PRODUCTS',
   // @wix/stores productsV3.getProduct (Catalog V3)

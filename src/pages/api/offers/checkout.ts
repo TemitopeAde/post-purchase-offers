@@ -5,7 +5,8 @@ import { recordOfferEvent } from '../../../lib/wix/data';
 export const POST: APIRoute = async ({ request }) => {
   try {
     const body = await request.json();
-    const { productId, variantId, campaignId, offerId, originalOrderId, sessionKey, currency, offerPrice } = body;
+    // The offer price is computed server-side from the campaign; any client-sent price is ignored.
+    const { productId, variantId, campaignId, offerId, originalOrderId, sessionKey, currency } = body;
 
     if (!productId) {
       return Response.json({ error: 'productId is required' }, { status: 400 });
@@ -35,7 +36,7 @@ export const POST: APIRoute = async ({ request }) => {
       eventType: 'checkout_started',
       sessionKey: sessionKey || `session_${Date.now()}`,
       currency,
-      amount: offerPrice ? Number(offerPrice) : undefined,
+      amount: result.offerPrice,
     });
 
     return Response.json({
