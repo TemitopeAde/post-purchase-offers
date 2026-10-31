@@ -6,7 +6,7 @@ export default extensions.sitePlugin({
   marketData: {
     name: 'Smart Post-Purchase Offers',
     description: 'Smart post-purchase upsell and cross-sell offers to boost average order value.',
-    logoUrl: '{{BASE_URL}}/post-purchase-offers-logo.png',
+    logoUrl: 'https://static.wixstatic.com/media/ffcb22_de253b973d9c4a6fb74caac9451c7b3b~mv2.png',
   },
   placements: [
     {

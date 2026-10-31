@@ -122,6 +122,7 @@ export async function generateOffersForOrder(
     finalOffers = manualOffers
       .filter((o) => o.active && !order.purchasedProductIds.includes(o.productId))
       .sort((a, b) => (a.priority || 0) - (b.priority || 0))
+      .map((offer) => ({ ...offer, currency: offer.currency || candidateMap.get(offer.productId)?.currency }))
       .slice(0, campaign.recommendationMode === 'MANUAL' ? undefined : maxOffers);
     source = 'manual';
   }
@@ -198,6 +199,7 @@ export async function generateOffersForOrder(
     finalOffers = manualOffers
       .filter((o) => o.active && !order.purchasedProductIds.includes(o.productId))
       .sort((a, b) => (a.priority || 0) - (b.priority || 0))
+      .map((offer) => ({ ...offer, currency: offer.currency || candidateMap.get(offer.productId)?.currency }))
       .slice(0, maxOffers);
     source = 'manual';
   }

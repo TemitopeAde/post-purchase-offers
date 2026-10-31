@@ -32,7 +32,7 @@ export const POST: APIRoute = async ({ request }) => {
         originalOrderId: orderId,
         eventType: 'impression',
         sessionKey,
-        currency: offer.discountType ? undefined : undefined,
+        currency: offer.currency,
         amount: offer.offerPrice,
         aiRecommended: result.source === 'ai' || (result.source === 'hybrid' && offer.badge !== 'Selected by you'),
         recommendationReason: offer.reason,

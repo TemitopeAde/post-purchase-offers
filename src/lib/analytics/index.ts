@@ -1,6 +1,7 @@
 import { getOfferEvents, getCampaigns } from '../wix/data';
 
 export interface DashboardOverviewMetrics {
+  currency?: string;
   totalAttributedRevenue: number;
   totalImpressions: number;
   totalClicks: number;
@@ -118,6 +119,7 @@ export async function getDashboardOverviewMetrics(historyDays: number | null): P
     }));
 
   return {
+    currency: events.find((event) => event.currency)?.currency,
     totalAttributedRevenue: Math.round(totalAttributedRevenue * 100) / 100,
     totalImpressions,
     totalClicks,

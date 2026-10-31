@@ -86,7 +86,7 @@ const EN = {
   merchantProducts: 'Merchant-selected products',
   manualDescription: 'Manual campaigns show all selected products, in the order you picked them, skipping anything the customer just bought. AI, Rules, and Hybrid campaigns can show up to 4 offers.',
   discountPercentage: 'Discount Percentage (%)',
-  minimumSubtotal: 'Minimum Order Subtotal ($)',
+  minimumSubtotal: 'Minimum Order Subtotal',
   productPlaceholder: 'e.g. Phone Accessories Upsell',
   smartPlanError: 'AI recommendations require a Pro or Business plan.',
   billingUnavailable: "Billing details aren't available",

@@ -81,6 +81,7 @@ export const PATCH: APIRoute = async ({ params, request }) => {
             productName: product.name,
             productImageUrl: product.imageUrl,
             regularPrice: product.price,
+            currency: product.currency,
             discountType: updated.discountType,
             discountValue: updated.discountValue,
             offerPrice: calculateOfferPrice(product.price, updated.discountType, updated.discountValue),

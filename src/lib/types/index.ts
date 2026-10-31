@@ -49,6 +49,7 @@ export interface Offer {
   productName: string;
   productImageUrl?: string;
   regularPrice: number;
+  currency?: string;
   discountType: DiscountType;
   discountValue: number;
   offerPrice: number;

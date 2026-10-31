@@ -83,6 +83,18 @@ class PostPurchaseOffersElement extends HTMLElement {
     return translate(this.locale, key, values);
   }
 
+  private formatPrice(amount: number, currency?: string): string {
+    if (!currency) return amount.toFixed(2);
+    try {
+      return new Intl.NumberFormat(this.locale, {
+        style: 'currency',
+        currency,
+      }).format(amount);
+    } catch {
+      return `${currency} ${amount.toFixed(2)}`;
+    }
+  }
+
   private async isEditorMode(): Promise<boolean> {
     try {
       const mode = await wixWindow.viewMode();
@@ -303,6 +315,7 @@ class PostPurchaseOffersElement extends HTMLElement {
           offerId: offer._id,
           originalOrderId: orderId,
           offerPrice: offer.offerPrice,
+          currency: offer.currency,
         }),
       });
       this.log('Checkout response received', {
@@ -567,14 +580,10 @@ class PostPurchaseOffersElement extends HTMLElement {
 
             <div>
               <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 14px;">
-                <span style="${priceFont ? `font: ${priceFont};` : 'font-size: 18px; font-weight: 700;'} color: ${priceColor};">$${Number(
-                  offer.offerPrice
-                ).toFixed(2)}</span>
+                <span style="${priceFont ? `font: ${priceFont};` : 'font-size: 18px; font-weight: 700;'} color: ${priceColor};">${this.escapeHtml(this.formatPrice(Number(offer.offerPrice), offer.currency))}</span>
                 ${
                   hasDiscount
-                    ? `<span style="font-size: 13px; color: #9ca3af; text-decoration: line-through;">$${Number(
-                        offer.regularPrice
-                      ).toFixed(2)}</span>`
+                    ? `<span style="font-size: 13px; color: #9ca3af; text-decoration: line-through;">${this.escapeHtml(this.formatPrice(Number(offer.regularPrice), offer.currency))}</span>`
                     : ''
                 }
               </div>

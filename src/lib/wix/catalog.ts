@@ -112,7 +112,7 @@ export async function getProductCandidates(options: {
           description: typeof item.description === 'string' ? item.description : '',
           category: item.collectionIds?.[0],
           price,
-          currency: item.priceData?.currency || 'USD',
+          currency: item.priceData?.currency || '',
           imageUrl,
           inStock: item.stock?.inventoryStatus !== 'OUT_OF_STOCK',
         });
@@ -183,7 +183,7 @@ export async function searchProductCandidates(options: {
         description: typeof item.description === 'string' ? item.description : '',
         category: item.collectionIds?.[0],
         price: Number(item.priceData?.discountedPrice || item.priceData?.price || 0),
-        currency: item.priceData?.currency || 'USD',
+        currency: item.priceData?.currency || '',
         imageUrl: toBrowserImageUrl(item.media?.mainMedia?.image?.url),
         inStock: item.stock?.inventoryStatus !== 'OUT_OF_STOCK',
       }))
@@ -229,7 +229,7 @@ export async function getProductDetails(productId: string): Promise<ProductCandi
         description: desc,
         category: product.directCategoriesInfo?.categories?.[0]?._id,
         price: priceAmount,
-        currency: product.currency || 'USD',
+        currency: product.currency || '',
         imageUrl,
         inStock: product.inventory?.availabilityStatus !== 'OUT_OF_STOCK',
       };
@@ -247,7 +247,7 @@ export async function getProductDetails(productId: string): Promise<ProductCandi
         description: typeof product.description === 'string' ? product.description : '',
         category: product.collectionIds?.[0],
         price,
-        currency: product.priceData?.currency || 'USD',
+          currency: product.priceData?.currency || '',
         imageUrl,
         inStock: product.stock?.inventoryStatus !== 'OUT_OF_STOCK',
       };
@@ -293,7 +293,7 @@ export async function getProductVariants(productId: string): Promise<ProductVari
             variantId: variant._id,
             choices,
             price,
-            currency: (product as any)?.currency || 'USD',
+            currency: (product as any)?.currency || '',
             inStock: variant.inventoryStatus?.inStock !== false,
           };
         })
@@ -311,7 +311,7 @@ export async function getProductVariants(productId: string): Promise<ProductVari
           variantId,
           choices: item.choices || {},
           price: Number(item.variant?.priceData?.discountedPrice || item.variant?.priceData?.price || 0),
-          currency: item.variant?.priceData?.currency || 'USD',
+      currency: item.variant?.priceData?.currency || '',
           inStock: item.variant?.stock?.inventoryStatus !== 'OUT_OF_STOCK',
         };
       })

@@ -35,6 +35,15 @@ const { fetchWithAuth } = httpClient;
 const capitalizeFirstCharacter = (value: string) =>
   value.replace(/^(\s*)(\S)/, (_, leading, first) => `${leading}${first.toUpperCase()}`);
 
+const formatMoney = (amount: number, currency: string | undefined, locale: Locale) => {
+  if (!currency) return amount.toFixed(2);
+  try {
+    return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount);
+  } catch {
+    return `${currency} ${amount.toFixed(2)}`;
+  }
+};
+
 export const PostPurchaseDashboard: FC = () => {
   const [locale, setLocale] = useState<Locale>(getInitialLocale);
   const t = (key: Parameters<typeof translate>[1], values?: Record<string, string | number>) => translate(locale, key, values);
@@ -338,7 +347,7 @@ export const PostPurchaseDashboard: FC = () => {
           discountType: 'PERCENTAGE',
           discountValue: parsed.data.discount,
           ...(isEditing ? {} : {
-            currency: 'USD',
+            ...(selectedManualProducts[0]?.currency ? { currency: selectedManualProducts[0].currency } : {}),
             fallbackMode: 'RULES',
             displayHeading: t('specialOffer'),
             ctaText: t('claimOffer'),
@@ -454,7 +463,7 @@ export const PostPurchaseDashboard: FC = () => {
                           {t('attributedRevenue')}
                         </Text>
                         <Heading size="medium">
-                          ${overviewMetrics?.totalAttributedRevenue.toFixed(2) || '0.00'}
+                          {formatMoney(overviewMetrics?.totalAttributedRevenue || 0, overviewMetrics?.currency, locale)}
                         </Heading>
                         <Text size="tiny" skin="success">
                           {t('postPurchaseSales')}
@@ -612,7 +621,7 @@ export const PostPurchaseDashboard: FC = () => {
                               <td style={{ padding: '12px 8px' }}>{c.clicks}</td>
                               <td style={{ padding: '12px 8px' }}>{c.purchases}</td>
                               <td style={{ padding: '12px 8px', fontWeight: 600, color: '#10b981' }}>
-                                ${c.revenue.toFixed(2)}
+                                {formatMoney(c.revenue, overviewMetrics?.currency, locale)}
                               </td>
                               <td style={{ padding: '12px 8px' }}>{c.conversionRate}%</td>
                             </tr>
@@ -682,10 +691,12 @@ export const PostPurchaseDashboard: FC = () => {
                               <td style={{ padding: '12px 8px' }}>
                                 {camp.discountType === 'PERCENTAGE'
                                   ? `${camp.discountValue}% OFF`
-                                  : `$${camp.discountValue} OFF`}
+                                  : `${formatMoney(camp.discountValue, camp.currency || overviewMetrics?.currency, locale)} OFF`}
                               </td>
                               <td style={{ padding: '12px 8px' }}>
-                                {camp.minOrderSubtotal ? `$${camp.minOrderSubtotal}` : t('noMinimum')}
+                                {camp.minOrderSubtotal
+                                  ? formatMoney(camp.minOrderSubtotal, camp.currency || overviewMetrics?.currency, locale)
+                                  : t('noMinimum')}
                               </td>
                               <td style={{ padding: '12px 8px' }}>
                                 <Badge skin={camp.status === 'active' ? 'success' : 'warning'}>

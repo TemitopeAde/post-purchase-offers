@@ -29,7 +29,14 @@ interface ProductPickerProps {
   locale: Locale;
 }
 
-const formatPrice = (product: ProductCandidate) => `$${product.price.toFixed(2)}`;
+const formatPrice = (product: ProductCandidate, locale: Locale) => {
+  if (!product.currency) return product.price.toFixed(2);
+  try {
+    return new Intl.NumberFormat(locale, { style: 'currency', currency: product.currency }).format(product.price);
+  } catch {
+    return `${product.currency} ${product.price.toFixed(2)}`;
+  }
+};
 
 export const ProductPicker: FC<ProductPickerProps> = ({
   products,
@@ -124,7 +131,7 @@ export const ProductPicker: FC<ProductPickerProps> = ({
               )}
               <Box direction="vertical" flexGrow={1} minWidth="0">
                 <Text size="small" weight="bold" ellipsis>{product.name}</Text>
-                <Text size="tiny" secondary>{formatPrice(product)}</Text>
+                <Text size="tiny" secondary>{formatPrice(product, locale)}</Text>
               </Box>
               {!product.inStock && <Badge size="small" skin="neutralLight">{t('outOfStock')}</Badge>}
             </Box>

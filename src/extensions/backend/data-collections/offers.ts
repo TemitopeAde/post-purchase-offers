@@ -13,6 +13,7 @@ export default {
     { key: 'productName', displayName: 'Product Name', type: 'TEXT' },
     { key: 'productImageUrl', displayName: 'Product Image URL', type: 'TEXT' },
     { key: 'regularPrice', displayName: 'Regular Price', type: 'NUMBER' },
+    { key: 'currency', displayName: 'Currency', type: 'TEXT' },
     { key: 'discountType', displayName: 'Discount Type', type: 'TEXT' },
     { key: 'discountValue', displayName: 'Discount Value', type: 'NUMBER' },
     { key: 'offerPrice', displayName: 'Offer Price', type: 'NUMBER' },

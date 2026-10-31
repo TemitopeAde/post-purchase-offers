@@ -45,7 +45,7 @@ export async function getOrderContext(orderId: string): Promise<OrderContext | n
     }
 
     const subtotal = Number(order.priceSummary?.subtotal?.amount || 0);
-    const currency = order.currency || 'USD';
+    const currency = order.currency || '';
     const orderNum =
       typeof order.number === 'string'
         ? parseInt(order.number, 10)
