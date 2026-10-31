@@ -147,6 +147,12 @@ CRITICAL RULES:
           throw new Error('DeepSeek API returned empty response content');
         }
 
+        console.info('[Post-Purchase Offers][DeepSeek] Response content', {
+          attempt: attemptNumber,
+          responseContent: content,
+          usage: data?.usage ?? null,
+        });
+
         const parsedJson = JSON.parse(content);
         const validated = AIRecommendationResponseSchema.parse(parsedJson);
 
