@@ -1,8 +1,14 @@
 import type { APIRoute } from 'astro';
-import { getCampaigns, createCampaign } from '../../../lib/wix/data';
+import { getCampaigns, createCampaign, saveOffer } from '../../../lib/wix/data';
 import type { Campaign } from '../../../lib/types';
 import { campaignFormSchema } from '../../../lib/validation/campaign';
 import { checkCampaignActivation } from '../../../lib/wix/billing';
+import { getProductDetails } from '../../../lib/wix/catalog';
+import { calculateOfferPrice } from '../../../lib/recommendations/ranking';
+
+type CreateCampaignBody = Partial<Omit<Campaign, '_id'>> & {
+  manualProductIds?: unknown[];
+};
 
 export const GET: APIRoute = async () => {
   try {
@@ -15,7 +21,7 @@ export const GET: APIRoute = async () => {
 
 export const POST: APIRoute = async ({ request }) => {
   try {
-    const body = (await request.json()) as Partial<Omit<Campaign, '_id'>>;
+    const body = (await request.json()) as CreateCampaignBody;
     const parsed = campaignFormSchema.safeParse({
       name: body.name,
       discount: body.discountValue,
@@ -47,7 +53,7 @@ export const POST: APIRoute = async ({ request }) => {
       maxOrderSubtotal: body.maxOrderSubtotal ? Number(body.maxOrderSubtotal) : undefined,
       currency: body.currency || 'USD',
       recommendationMode: parsed.data.mode,
-      maxOffers: Number(body.maxOffers || 2),
+      maxOffers: Number(body.maxOffers || 4),
       fallbackMode: body.fallbackMode || 'RULES',
       discountType: body.discountType || 'PERCENTAGE',
       discountValue: parsed.data.discount,
@@ -55,6 +61,34 @@ export const POST: APIRoute = async ({ request }) => {
       displaySubheading: body.displaySubheading,
       ctaText: body.ctaText || 'Claim Offer',
     });
+
+    const manualProductIds = Array.isArray(body.manualProductIds)
+      ? body.manualProductIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
+      : [];
+    if (created._id && manualProductIds.length > 0 && (parsed.data.mode === 'MANUAL' || parsed.data.mode === 'HYBRID')) {
+      const products = await Promise.all(manualProductIds.map((productId) => getProductDetails(productId)));
+      await Promise.all(
+        products
+          .filter((product): product is NonNullable<typeof product> => Boolean(product))
+          .map((product, index) => saveOffer({
+            campaignId: created._id as string,
+            productId: product.productId,
+            variantId: product.variantId,
+            productName: product.name,
+            productImageUrl: product.imageUrl,
+            regularPrice: product.price,
+            discountType: body.discountType || 'PERCENTAGE',
+            discountValue: parsed.data.discount,
+            offerPrice: calculateOfferPrice(product.price, body.discountType || 'PERCENTAGE', parsed.data.discount),
+            title: product.name,
+            description: product.description || '',
+            badge: 'Selected by you',
+            priority: index + 1,
+            active: true,
+            reason: 'Selected manually by the merchant.',
+          })),
+      );
+    }
 
     return Response.json(created, { status: 201 });
   } catch (err: any) {

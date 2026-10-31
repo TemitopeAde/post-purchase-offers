@@ -1,7 +1,7 @@
 import type { Campaign, Offer, ProductCandidate } from '../types';
 import { getCampaigns, getOffersByCampaign, getAppSettings, recordOfferEvent, getMonthlyAiUsage } from '../wix/data';
 import { getPlanContext } from '../wix/billing';
-import { getProductCandidates } from '../wix/catalog';
+import { getProductCandidates, getProductDetails } from '../wix/catalog';
 import { getOrderContext, type OrderContext } from '../wix/orders';
 import { defaultDeepSeekProvider } from '../ai/providers/deepseek';
 import { rankCandidatesDeterministically, mergeAiRankingsWithOffers } from './ranking';
@@ -16,7 +16,7 @@ export interface RecommendationResponse {
   };
   offers: Offer[];
   orderId?: string;
-  source: 'ai' | 'rules' | 'manual';
+  source: 'ai' | 'rules' | 'manual' | 'hybrid';
 }
 
 export function isCampaignEligible(campaign: Campaign, order: OrderContext): boolean {
@@ -80,7 +80,12 @@ export async function generateOffersForOrder(
   }
 
   const campaign = eligibleCampaigns[0];
-  const maxOffers = Math.min(campaign.maxOffers || settings.maxRecommendations || 2, 4);
+  // Manual campaigns should display every product the merchant selected.
+  // AI and Hybrid remain bounded because they generate recommendations.
+  const requestedMaxOffers = campaign.maxOffers || settings.maxRecommendations || 4;
+  const maxOffers = campaign.recommendationMode === 'MANUAL'
+    ? Math.max(requestedMaxOffers, 1)
+    : Math.max(requestedMaxOffers, 4);
 
   // Exclude products already bought in this order plus campaign exclusions
   const excludedIds = [
@@ -93,17 +98,31 @@ export async function generateOffersForOrder(
     maxLimit: 25,
   });
 
+  const purchasedProducts = await Promise.all(
+    order.purchasedProducts.map(async (product) => {
+      const details = await getProductDetails(product.productId);
+      return {
+        ...product,
+        category: details?.category,
+        description: product.description || details?.description,
+      };
+    }),
+  );
+
   const candidateMap = new Map<string, ProductCandidate>(
     candidates.map((c) => [c.productId, c])
   );
 
   let finalOffers: Offer[] = [];
-  let source: 'ai' | 'rules' | 'manual' = 'rules';
+  let source: 'ai' | 'rules' | 'manual' | 'hybrid' = 'rules';
 
-  // 1. Try MANUAL offers if mode is MANUAL or HYBRID
-  if (campaign.recommendationMode === 'MANUAL' && campaign._id) {
+  // 1. Use merchant-selected offers first for MANUAL and HYBRID campaigns.
+  if ((campaign.recommendationMode === 'MANUAL' || campaign.recommendationMode === 'HYBRID') && campaign._id) {
     const manualOffers = await getOffersByCampaign(campaign._id);
-    finalOffers = manualOffers.filter((o) => o.active && !order.purchasedProductIds.includes(o.productId));
+    finalOffers = manualOffers
+      .filter((o) => o.active && !order.purchasedProductIds.includes(o.productId))
+      .sort((a, b) => (a.priority || 0) - (b.priority || 0))
+      .slice(0, campaign.recommendationMode === 'MANUAL' ? undefined : maxOffers);
     source = 'manual';
   }
 
@@ -148,7 +167,7 @@ export async function generateOffersForOrder(
 
       const aiResult = await defaultDeepSeekProvider.recommend({
         currency: order.currency,
-        purchasedProducts: order.purchasedProducts,
+        purchasedProducts,
         candidates,
         maxRecommendations: maxOffers - finalOffers.length,
       });
@@ -164,7 +183,7 @@ export async function generateOffersForOrder(
           campaign
         );
         finalOffers = [...finalOffers, ...aiOffers];
-        source = 'ai';
+        source = campaign.recommendationMode === 'HYBRID' && finalOffers.length > 0 ? 'hybrid' : 'ai';
       }
     } catch (err) {
       console.error('[Post-Purchase Offers][Recommendations] AI recommendation failed; falling back to rules', {
@@ -174,13 +193,25 @@ export async function generateOffersForOrder(
   }
 
   // 3. Fallback to deterministic rules if needed
-  if (finalOffers.length === 0 && campaign.fallbackMode !== 'NONE') {
+  if (finalOffers.length === 0 && campaign.fallbackMode === 'MANUAL' && campaign._id) {
+    const manualOffers = await getOffersByCampaign(campaign._id);
+    finalOffers = manualOffers
+      .filter((o) => o.active && !order.purchasedProductIds.includes(o.productId))
+      .sort((a, b) => (a.priority || 0) - (b.priority || 0))
+      .slice(0, maxOffers);
+    source = 'manual';
+  }
+
+  if (finalOffers.length === 0 && campaign.fallbackMode === 'RULES') {
     console.info('[Post-Purchase Offers][Recommendations] Using deterministic fallback', {
       fallbackMode: campaign.fallbackMode,
       candidateCount: candidates.length,
     });
     finalOffers = rankCandidatesDeterministically(candidates, {
       orderSubtotal: order.subtotal,
+      purchasedCategories: purchasedProducts
+        .map((product) => product.category)
+        .filter((category): category is string => Boolean(category)),
       maxOffers,
       campaign,
     });
@@ -202,7 +233,9 @@ export async function generateOffersForOrder(
         'Complementary picks tailored to your recent order.',
       ctaText: campaign.ctaText || 'Claim Offer',
     },
-    offers: finalOffers.slice(0, maxOffers),
+    offers: campaign.recommendationMode === 'MANUAL'
+      ? finalOffers
+      : finalOffers.slice(0, maxOffers),
     orderId: order.orderId,
     source,
   };

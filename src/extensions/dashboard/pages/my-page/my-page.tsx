@@ -22,8 +22,9 @@ import { Add, Delete, Check, Refresh } from '@wix/wix-ui-icons-common/lazy';
 import { httpClient } from '@wix/essentials';
 import { Toaster, toast } from 'sonner';
 import { BusinessManagerTheme } from '../../BusinessManagerTheme';
-import type { Campaign, AppSettings, BillingStatus } from '../../../../lib/types';
+import type { Campaign, AppSettings, BillingStatus, ProductCandidate } from '../../../../lib/types';
 import { BillingTab } from './BillingTab';
+import { ProductPicker } from './ProductPicker';
 import type { DashboardOverviewMetrics } from '../../../../lib/analytics';
 import { campaignFormSchema, type CampaignFormValues } from '../../../../lib/validation/campaign';
 
@@ -48,6 +49,13 @@ export const PostPurchaseDashboard: FC = () => {
   const [newCampaignDiscount, setNewCampaignDiscount] = useState('15');
   const [newCampaignMode, setNewCampaignMode] = useState<CampaignFormValues['mode']>('AI');
   const [newCampaignMinSubtotal, setNewCampaignMinSubtotal] = useState('0');
+  const [manualProducts, setManualProducts] = useState<ProductCandidate[]>([]);
+  // Full products, not just ids, so selections stay visible when a new search replaces the list.
+  const [selectedManualProducts, setSelectedManualProducts] = useState<ProductCandidate[]>([]);
+  const [manualProductSearch, setManualProductSearch] = useState('');
+  const [manualProductCursor, setManualProductCursor] = useState<string | undefined>();
+  const [manualProductHasNext, setManualProductHasNext] = useState(false);
+  const [loadingManualProducts, setLoadingManualProducts] = useState(false);
   const [isSavingCampaign, setIsSavingCampaign] = useState(false);
   const [campaignToToggle, setCampaignToToggle] = useState<Campaign | null>(null);
   const [isTogglingCampaign, setIsTogglingCampaign] = useState(false);
@@ -60,6 +68,11 @@ export const PostPurchaseDashboard: FC = () => {
     setNewCampaignDiscount('15');
     setNewCampaignMinSubtotal('0');
     setNewCampaignMode(canUseAiRecommendations ? 'AI' : 'RULES');
+    setSelectedManualProducts([]);
+    setManualProductSearch('');
+    setManualProductCursor(undefined);
+    setManualProductHasNext(false);
+    setManualProducts([]);
   };
 
   const closeCampaignModal = () => {
@@ -75,7 +88,7 @@ export const PostPurchaseDashboard: FC = () => {
     setShowCreateModal(true);
   };
 
-  const openEditCampaign = (campaign: Campaign) => {
+  const openEditCampaign = async (campaign: Campaign) => {
     setCampaignToEdit(campaign);
     setNewCampaignName(campaign.name);
     setNewCampaignDiscount(String(campaign.discountValue ?? 0));
@@ -85,8 +98,56 @@ export const PostPurchaseDashboard: FC = () => {
         ? 'RULES'
         : campaign.recommendationMode as CampaignFormValues['mode'],
     );
+    setSelectedManualProducts([]);
+    if (campaign._id && (campaign.recommendationMode === 'MANUAL' || campaign.recommendationMode === 'HYBRID')) {
+      try {
+        const response = await fetchWithAuth(`/api/campaigns/${campaign._id}`);
+        if (!response.ok) throw new Error('Failed to load campaign products');
+        const details = await response.json();
+        if (Array.isArray(details?.manualProducts)) {
+          setSelectedManualProducts(details.manualProducts as ProductCandidate[]);
+        }
+      } catch (err) {
+        console.error('Failed to load selected campaign products:', err);
+        toast.error('Could not load the products selected for this campaign');
+      }
+    }
     setShowCreateModal(true);
   };
+
+  const loadManualProducts = async (search = '', cursor?: string, append = false) => {
+    setLoadingManualProducts(true);
+    try {
+      const params = new URLSearchParams({ limit: '20' });
+      if (search.trim()) params.set('q', search.trim());
+      if (cursor) params.set('cursor', cursor);
+      const response = await fetchWithAuth(`/api/products?${params.toString()}`);
+      if (!response.ok) throw new Error('Failed to load products');
+      const result = await response.json();
+      const products = Array.isArray(result?.products) ? result.products : [];
+      setManualProducts((previous) => {
+        if (!append) return products;
+        const merged = new Map(previous.map((product) => [product.productId, product]));
+        products.forEach((product: ProductCandidate) => merged.set(product.productId, product));
+        return Array.from(merged.values());
+      });
+      setManualProductCursor(result?.nextCursor || undefined);
+      setManualProductHasNext(Boolean(result?.hasNext));
+    } catch (err) {
+      console.error('Failed to load products for manual campaign:', err);
+      toast.error('Could not load store products');
+    } finally {
+      setLoadingManualProducts(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!showCreateModal || (newCampaignMode !== 'MANUAL' && newCampaignMode !== 'HYBRID')) return;
+    const timer = window.setTimeout(() => {
+      void loadManualProducts(manualProductSearch);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [showCreateModal, newCampaignMode, manualProductSearch]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -239,11 +300,16 @@ export const PostPurchaseDashboard: FC = () => {
           ...(isEditing ? {} : { status: 'active', priority: 5 }),
           minOrderSubtotal: parsed.data.minSubtotal,
           recommendationMode: parsed.data.mode,
+          maxOffers: parsed.data.mode === 'MANUAL'
+            ? Math.max(selectedManualProducts.length, 1)
+            : 4,
+          ...((parsed.data.mode === 'MANUAL' || parsed.data.mode === 'HYBRID')
+            ? { manualProductIds: selectedManualProducts.map((product) => product.productId) }
+            : {}),
           discountType: 'PERCENTAGE',
           discountValue: parsed.data.discount,
           ...(isEditing ? {} : {
             currency: 'USD',
-            maxOffers: 2,
             fallbackMode: 'RULES',
             displayHeading: 'Special add-on offer for your order',
             ctaText: 'Claim Offer',
@@ -631,6 +697,26 @@ export const PostPurchaseDashboard: FC = () => {
                             <option value="MANUAL">Manual Products Only</option>
                           </select>
                         </FormField>
+
+                        {(newCampaignMode === 'MANUAL' || newCampaignMode === 'HYBRID') && (
+                          <FormField label="Merchant-selected products">
+                            <Box direction="vertical" gap="SP2">
+                              <ProductPicker
+                                products={manualProducts}
+                                selected={selectedManualProducts}
+                                onChange={setSelectedManualProducts}
+                                search={manualProductSearch}
+                                onSearchChange={setManualProductSearch}
+                                loading={loadingManualProducts}
+                                hasNext={manualProductHasNext}
+                                onLoadMore={() => void loadManualProducts(manualProductSearch, manualProductCursor, true)}
+                              />
+                            </Box>
+                            <Text size="tiny" secondary>
+                              Manual campaigns show all selected products, in the order you picked them, skipping anything the customer just bought. AI, Rules, and Hybrid campaigns can show up to 4 offers.
+                            </Text>
+                          </FormField>
+                        )}
 
                         <Box gap="SP3">
                           <Box direction="vertical" style={{ flex: 1 }}>

@@ -3,6 +3,12 @@ import type { ProductCandidate } from '../types';
 
 export type CatalogVersion = 'V1_CATALOG' | 'V3_CATALOG' | 'STORES_NOT_INSTALLED';
 
+export interface ProductSearchPage {
+  products: ProductCandidate[];
+  nextCursor?: string;
+  hasNext: boolean;
+}
+
 let cachedVersion: CatalogVersion | undefined;
 
 function getVariantId(variant: unknown): string | undefined {
@@ -99,6 +105,82 @@ export async function getProductCandidates(options: {
   }
 
   return candidates;
+}
+
+/**
+ * Search a bounded page of products for dashboard pickers. The dashboard must
+ * never load the entire catalog: a store can contain thousands of products.
+ */
+export async function searchProductCandidates(options: {
+  query?: string;
+  cursor?: string;
+  limit?: number;
+}): Promise<ProductSearchPage> {
+  const version = await getStoreCatalogVersion();
+  const limit = Math.min(Math.max(options.limit || 20, 1), 50);
+  const query = options.query?.trim() || '';
+
+  try {
+    if (version === 'V3_CATALOG') {
+      const response = await productsV3.searchProducts(
+        {
+          ...(query
+            ? { search: { expression: query, fields: ['name', 'description'] } }
+            : {}),
+          cursorPaging: {
+            limit,
+            ...(options.cursor ? { cursor: options.cursor } : {}),
+          },
+        },
+        { fields: ['CURRENCY', 'THUMBNAIL', 'URL'] },
+      );
+
+      const productIds = (response.products || [])
+        .map((item) => item._id)
+        .filter((productId): productId is string => Boolean(productId));
+      const products = (await Promise.all(productIds.map((productId) => getProductDetails(productId))))
+        .filter((product): product is ProductCandidate => Boolean(product && product.price > 0));
+
+      return {
+        products,
+        nextCursor: response.pagingMetadata?.cursors?.next ?? undefined,
+        hasNext: Boolean(response.pagingMetadata?.hasNext),
+      };
+    }
+
+    // V1 uses offset paging. Keep the offset opaque to the client so the API
+    // has one cursor-shaped contract for both catalog versions.
+    const offset = Number(options.cursor || 0) || 0;
+    let request = products.queryProducts();
+    // The legacy V1 builder supports `contains`, but some installed SDK
+    // typings expose only the common builder methods.
+    if (query) request = (request as any).contains('name', query);
+    const response = await request.skip(offset).limit(limit).find();
+    const items = response.items || [];
+    const productResults = items
+      .filter((item) => Boolean(item._id))
+      .map((item) => ({
+        productId: item._id as string,
+        name: item.name || 'Store Product',
+        description: typeof item.description === 'string' ? item.description : '',
+        category: item.collectionIds?.[0],
+        price: Number(item.priceData?.discountedPrice || item.priceData?.price || 0),
+        currency: item.priceData?.currency || 'USD',
+        imageUrl: toBrowserImageUrl(item.media?.mainMedia?.image?.url),
+        inStock: item.stock?.inventoryStatus !== 'OUT_OF_STOCK',
+      }))
+      .filter((product) => product.price > 0);
+
+    const hasNext = items.length === limit;
+    return {
+      products: productResults,
+      nextCursor: hasNext ? String(offset + items.length) : undefined,
+      hasNext,
+    };
+  } catch (err) {
+    console.warn('Error searching products from Wix Stores:', err);
+    return { products: [], hasNext: false };
+  }
 }
 
 export async function getProductDetails(productId: string): Promise<ProductCandidate | null> {

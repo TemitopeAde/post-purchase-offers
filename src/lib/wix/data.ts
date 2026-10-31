@@ -145,6 +145,22 @@ export async function saveOffer(offer: Offer): Promise<Offer> {
   return item;
 }
 
+export async function removeOffersByCampaign(campaignId: string): Promise<void> {
+  const offers = await getOffersByCampaign(campaignId);
+  await Promise.all(
+    offers.map(async (offer) => {
+      if (offer._id) {
+        try {
+          await elevatedRemove(COLLECTIONS.OFFERS, offer._id);
+        } catch (err) {
+          // Keep the in-memory fallback consistent even when Wix Data is unavailable.
+        }
+        memoryOffers.delete(offer._id);
+      }
+    }),
+  );
+}
+
 // --- Offer Events & Analytics ---
 export async function recordOfferEvent(event: Omit<OfferEvent, '_id' | '_createdDate'>): Promise<OfferEvent> {
   const item: OfferEvent = {

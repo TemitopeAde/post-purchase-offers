@@ -34,7 +34,7 @@ export const POST: APIRoute = async ({ request }) => {
         sessionKey,
         currency: offer.discountType ? undefined : undefined,
         amount: offer.offerPrice,
-        aiRecommended: result.source === 'ai',
+        aiRecommended: result.source === 'ai' || (result.source === 'hybrid' && offer.badge !== 'Selected by you'),
         recommendationReason: offer.reason,
       });
     }

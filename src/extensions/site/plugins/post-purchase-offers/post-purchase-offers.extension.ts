@@ -12,7 +12,7 @@ export default extensions.sitePlugin({
     {
       appDefinitionId: '1380b703-ce81-ff05-f115-39571d94dfcd',
       widgetId: '1380bbb4-8df0-fd38-a235-88821cf3f8a4',
-      slotId: 'thank-you-page:items:after',
+      slotId: 'thank-you-page:details:before',
     },
   ],
   installation: { autoAdd: true },
