@@ -16,8 +16,9 @@
     "permissions:add": "node scripts/add-app-permissions.mjs"
   },
   "dependencies": {
-    "@wix/astro": "^2.75.3",
     "@wix/app-management": "^1.0.173",
+    "@wix/app-tools": "^1.0.7",
+    "@wix/astro": "^2.75.3",
     "@wix/dashboard": "^1.3.43",
     "@wix/data": "^1.0.539",
     "@wix/design-system": "^1.154.0",
@@ -32,7 +33,8 @@
     "react-to-webcomponent": "^2.0.0",
     "sonner": "^2.0.8",
     "typescript": "^5.8.3",
-    "zod": "^4.6.7"
+    "zod": "^4.6.7",
+    "@wix/crm": "^1.0.125"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.9",

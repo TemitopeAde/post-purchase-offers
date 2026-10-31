@@ -30,6 +30,9 @@ import { campaignFormSchema, type CampaignFormValues } from '../../../../lib/val
 const Box = WdsBox as any;
 const { fetchWithAuth } = httpClient;
 
+const capitalizeFirstCharacter = (value: string) =>
+  value.replace(/^(\s*)(\S)/, (_, leading, first) => `${leading}${first.toUpperCase()}`);
+
 export const PostPurchaseDashboard: FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
@@ -45,6 +48,10 @@ export const PostPurchaseDashboard: FC = () => {
   const [newCampaignMode, setNewCampaignMode] = useState<CampaignFormValues['mode']>('AI');
   const [newCampaignMinSubtotal, setNewCampaignMinSubtotal] = useState('0');
   const [isSavingCampaign, setIsSavingCampaign] = useState(false);
+  const [campaignToToggle, setCampaignToToggle] = useState<Campaign | null>(null);
+  const [isTogglingCampaign, setIsTogglingCampaign] = useState(false);
+  const [campaignToDelete, setCampaignToDelete] = useState<Campaign | null>(null);
+  const [isDeletingCampaign, setIsDeletingCampaign] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -85,6 +92,25 @@ export const PostPurchaseDashboard: FC = () => {
     }
   };
 
+  // Comes from the plan on Wix billing, not from app settings.
+  const aiAllowance = billing && !('error' in billing) ? billing.limits?.monthlyAiRecommendations : undefined;
+  const activationNeedsPlan = Boolean(
+    campaignToToggle &&
+      campaignToToggle.status !== 'active' &&
+      billing &&
+      !billing.isDevelopment &&
+      !billing.plan,
+  );
+
+  const openPricing = () => {
+    if (billing?.upgradeUrl) {
+      window.open(billing.upgradeUrl, '_blank', 'noopener');
+      return;
+    }
+    setCampaignToToggle(null);
+    setActiveTab('billing');
+  };
+
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);
     void refreshTab(tabId);
@@ -94,24 +120,56 @@ export const PostPurchaseDashboard: FC = () => {
     fetchData();
   }, []);
 
-  const handleToggleCampaign = async (id?: string) => {
+  const handleToggleCampaign = async () => {
+    const id = campaignToToggle?._id;
     if (!id) return;
+
+    setIsTogglingCampaign(true);
     try {
-      await fetchWithAuth(`/api/campaigns/${id}/activate`, { method: 'POST' });
+      const res = await fetchWithAuth(`/api/campaigns/${id}/activate`, { method: 'POST' });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as { error?: string };
+        if (err.error === 'Choose a plan to activate campaigns.') {
+          setCampaignToToggle(null);
+          setActiveTab('billing');
+        }
+        toast.error(err.error || 'Could not update the campaign');
+        return;
+      }
+
+      const action = campaignToToggle.status === 'active' ? 'paused' : 'activated';
+      setCampaignToToggle(null);
+      toast.success(`Campaign ${action}`);
       await fetchData();
     } catch (err) {
       console.error('Failed to toggle campaign:', err);
+      toast.error('Could not update the campaign. Please try again.');
+    } finally {
+      setIsTogglingCampaign(false);
     }
   };
 
-  const handleDeleteCampaign = async (id?: string) => {
+  const handleDeleteCampaign = async () => {
+    const id = campaignToDelete?._id;
     if (!id) return;
-    if (!confirm('Are you sure you want to delete this campaign?')) return;
+
+    setIsDeletingCampaign(true);
     try {
-      await fetchWithAuth(`/api/campaigns/${id}`, { method: 'DELETE' });
+      const response = await fetchWithAuth(`/api/campaigns/${id}`, { method: 'DELETE' });
+      if (!response.ok) {
+        const err = (await response.json().catch(() => ({}))) as { error?: string };
+        toast.error(err.error || 'Could not delete the campaign');
+        return;
+      }
+
+      setCampaignToDelete(null);
+      toast.success('Campaign deleted');
       await fetchData();
     } catch (err) {
       console.error('Failed to delete campaign:', err);
+      toast.error('Could not delete the campaign. Please try again.');
+    } finally {
+      setIsDeletingCampaign(false);
     }
   };
 
@@ -230,7 +288,7 @@ export const PostPurchaseDashboard: FC = () => {
 
             {loading ? (
               <Box align="center" justify="center" padding="SP8">
-                <Loader text="Loading your store's post-purchase data..." />
+                <Loader />
               </Box>
             ) : null}
 
@@ -354,7 +412,9 @@ export const PostPurchaseDashboard: FC = () => {
                         <tbody>
                           {overviewMetrics.campaignPerformance.map((c) => (
                             <tr key={c.campaignId} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                              <td style={{ padding: '12px 8px', fontWeight: 600 }}>{c.campaignName}</td>
+                              <td style={{ padding: '12px 8px', fontWeight: 600 }}>
+                                {capitalizeFirstCharacter(c.campaignName)}
+                              </td>
                               <td style={{ padding: '12px 8px' }}>{c.impressions}</td>
                               <td style={{ padding: '12px 8px' }}>{c.clicks}</td>
                               <td style={{ padding: '12px 8px' }}>{c.purchases}</td>
@@ -416,7 +476,7 @@ export const PostPurchaseDashboard: FC = () => {
                           {campaigns.map((camp) => (
                             <tr key={camp._id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                               <td style={{ padding: '12px 8px' }}>
-                                <Text weight="bold">{camp.name}</Text>
+                                <Text weight="bold">{capitalizeFirstCharacter(camp.name)}</Text>
                                 {camp.description && (
                                   <Text size="tiny" secondary>
                                     {camp.description}
@@ -445,7 +505,7 @@ export const PostPurchaseDashboard: FC = () => {
                                     size="tiny"
                                     skin="standard"
                                     priority="secondary"
-                                    onClick={() => handleToggleCampaign(camp._id)}
+                                    onClick={() => setCampaignToToggle(camp)}
                                   >
                                     {camp.status === 'active' ? 'Pause' : 'Activate'}
                                   </Button>
@@ -454,7 +514,7 @@ export const PostPurchaseDashboard: FC = () => {
                                     skin="destructive"
                                     priority="tertiary"
                                     prefixIcon={<Delete />}
-                                    onClick={() => handleDeleteCampaign(camp._id)}
+                                    onClick={() => setCampaignToDelete(camp)}
                                   />
                                 </Box>
                               </td>
@@ -538,6 +598,88 @@ export const PostPurchaseDashboard: FC = () => {
                     }
                   />
                 </Modal>
+
+                <Modal
+                  isOpen={Boolean(campaignToToggle)}
+                  onRequestClose={() => !isTogglingCampaign && setCampaignToToggle(null)}
+                  shouldCloseOnOverlayClick={!isTogglingCampaign}
+                  contentLabel={`${campaignToToggle?.status === 'active' ? 'Pause' : 'Activate'} campaign confirmation`}
+                  screen="desktop"
+                >
+                  <CustomModalLayout
+                    title={`${campaignToToggle?.status === 'active' ? 'Pause' : 'Activate'} campaign?`}
+                    subtitle={campaignToToggle?.name}
+                    primaryButtonText={activationNeedsPlan
+                      ? billing?.upgradeUrl
+                        ? 'Choose a plan'
+                        : 'View billing'
+                      : isTogglingCampaign
+                        ? campaignToToggle?.status === 'active'
+                          ? 'Pausing…'
+                          : 'Activating…'
+                        : campaignToToggle?.status === 'active'
+                          ? 'Pause campaign'
+                          : 'Activate campaign'
+                    }
+                    primaryButtonProps={{
+                      skin: campaignToToggle?.status === 'active' ? 'destructive' : 'standard',
+                      disabled: isTogglingCampaign,
+                    }}
+                    primaryButtonOnClick={() => {
+                      if (activationNeedsPlan) {
+                        openPricing();
+                        return;
+                      }
+                      void handleToggleCampaign();
+                    }}
+                    secondaryButtonText="Cancel"
+                    secondaryButtonProps={{ disabled: isTogglingCampaign }}
+                    secondaryButtonOnClick={() => setCampaignToToggle(null)}
+                    closeButtonProps={{
+                      size: 'small',
+                      onClick: () => !isTogglingCampaign && setCampaignToToggle(null),
+                    }}
+                  >
+                    <Text>
+                      {activationNeedsPlan
+                        ? 'Choose a Pro or Business plan to activate campaigns and show offers to your customers.'
+                        : campaignToToggle?.status === 'active'
+                        ? 'This campaign will stop showing post-purchase offers until you activate it again.'
+                        : 'This campaign will start showing post-purchase offers on eligible orders.'}
+                    </Text>
+                  </CustomModalLayout>
+                </Modal>
+
+                <Modal
+                  isOpen={Boolean(campaignToDelete)}
+                  onRequestClose={() => !isDeletingCampaign && setCampaignToDelete(null)}
+                  shouldCloseOnOverlayClick={!isDeletingCampaign}
+                  contentLabel="Delete campaign confirmation"
+                  screen="desktop"
+                >
+                  <CustomModalLayout
+                    skin="destructive"
+                    title="Delete campaign?"
+                    subtitle={`This will permanently delete ${campaignToDelete?.name || 'this campaign'}.`}
+                    primaryButtonText={isDeletingCampaign ? 'Deleting…' : 'Delete campaign'}
+                    primaryButtonProps={{
+                      skin: 'destructive',
+                      disabled: isDeletingCampaign,
+                    }}
+                    primaryButtonOnClick={() => void handleDeleteCampaign()}
+                    secondaryButtonText="Cancel"
+                    secondaryButtonProps={{ disabled: isDeletingCampaign }}
+                    secondaryButtonOnClick={() => setCampaignToDelete(null)}
+                    closeButtonProps={{
+                      size: 'small',
+                      onClick: () => !isDeletingCampaign && setCampaignToDelete(null),
+                    }}
+                  >
+                    <Text>
+                      Any offers associated with this campaign will no longer be shown on your Thank You page.
+                    </Text>
+                  </CustomModalLayout>
+                </Modal>
               </Box>
             )}
 
@@ -591,12 +733,12 @@ export const PostPurchaseDashboard: FC = () => {
                       <Box direction="vertical" gap="SP1">
                         <Text weight="bold">Cost & Usage Protection</Text>
                         <Text size="small" secondary>
-                          Monthly requests: {settings?.monthlyAiUsage || 0} / {settings?.monthlyAiAllowance || 500}
+                          Monthly requests: {settings?.monthlyAiUsage || 0} / {aiAllowance ?? 'no plan'}
                         </Text>
                         <div style={{ width: '100%', height: '8px', background: '#e5e7eb', borderRadius: '4px', overflow: 'hidden' }}>
                           <div
                             style={{
-                              width: `${Math.min(100, ((settings?.monthlyAiUsage || 0) / (settings?.monthlyAiAllowance || 500)) * 100)}%`,
+                              width: `${aiAllowance ? Math.min(100, ((settings?.monthlyAiUsage || 0) / aiAllowance) * 100) : 0}%`,
                               height: '100%',
                               background: '#116dff',
                             }}

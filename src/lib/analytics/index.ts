@@ -29,8 +29,13 @@ export interface DashboardOverviewMetrics {
   }[];
 }
 
-export async function getDashboardOverviewMetrics(): Promise<DashboardOverviewMetrics> {
-  const [events, campaigns] = await Promise.all([getOfferEvents(), getCampaigns()]);
+/** `historyDays` limits which events count; null includes all history. */
+export async function getDashboardOverviewMetrics(historyDays: number | null): Promise<DashboardOverviewMetrics> {
+  const [allEvents, campaigns] = await Promise.all([getOfferEvents(), getCampaigns()]);
+  // Wix Data may return _createdDate as a Date rather than an ISO string, so compare timestamps.
+  const sinceMs = historyDays === null ? null : Date.now() - historyDays * 24 * 60 * 60 * 1000;
+  const events =
+    sinceMs === null ? allEvents : allEvents.filter((e) => new Date(e._createdDate || 0).getTime() >= sinceMs);
 
   const activeCampaigns = campaigns.filter((c) => c.status === 'active');
 

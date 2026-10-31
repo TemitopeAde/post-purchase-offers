@@ -1,4 +1,5 @@
 import { items } from '@wix/data';
+import { auth } from '@wix/essentials';
 import type { Campaign, Offer, OfferEvent, AppSettings } from '../types';
 
 export const APP_NAMESPACE = '@admin14744/post-purchase-offers';
@@ -9,6 +10,12 @@ export const COLLECTIONS = {
   OFFER_EVENTS: `${APP_NAMESPACE}/offer-events`,
   APP_SETTINGS: `${APP_NAMESPACE}/app-settings`,
 } as const;
+
+const elevatedQuery = auth.elevate(items.query);
+const elevatedInsert = auth.elevate(items.insert);
+const elevatedUpdate = auth.elevate(items.update);
+const elevatedRemove = auth.elevate(items.remove);
+const elevatedSave = auth.elevate(items.save);
 
 // In-memory fallback stores when running in mock / preview environment or before collection publish
 const memoryCampaigns: Map<string, Campaign> = new Map();
@@ -27,7 +34,6 @@ let memorySettings: AppSettings = {
   borderRadius: 8,
   enableAiExplanations: true,
   plan: 'Pro',
-  monthlyAiAllowance: 500,
   monthlyAiUsage: 0,
 };
 
@@ -39,7 +45,7 @@ const getStartOfCurrentMonth = () => {
 // --- Campaigns CRUD ---
 export async function getCampaigns(): Promise<Campaign[]> {
   try {
-    const res = await items.query(COLLECTIONS.CAMPAIGNS).find();
+    const res = await elevatedQuery(COLLECTIONS.CAMPAIGNS).find();
     if (res.items && res.items.length > 0) {
       return res.items as unknown as Campaign[];
     }
@@ -51,7 +57,7 @@ export async function getCampaigns(): Promise<Campaign[]> {
 
 export async function getCampaignById(id: string): Promise<Campaign | null> {
   try {
-    const res = await items.query(COLLECTIONS.CAMPAIGNS).eq('_id', id).limit(1).find();
+    const res = await elevatedQuery(COLLECTIONS.CAMPAIGNS).eq('_id', id).limit(1).find();
     if (res.items && res.items.length > 0) return res.items[0] as unknown as Campaign;
   } catch (err) {
     // fallback
@@ -68,7 +74,7 @@ export async function createCampaign(campaign: Omit<Campaign, '_id'>): Promise<C
   };
 
   try {
-    const res = await items.insert(COLLECTIONS.CAMPAIGNS, newCamp as any);
+    const res = await elevatedInsert(COLLECTIONS.CAMPAIGNS, newCamp as any);
     if (res && res._id) {
       memoryCampaigns.set(res._id, res as unknown as Campaign);
       return res as unknown as Campaign;
@@ -92,7 +98,7 @@ export async function updateCampaign(id: string, updates: Partial<Campaign>): Pr
   };
 
   try {
-    await items.update(COLLECTIONS.CAMPAIGNS, merged as any);
+    await elevatedUpdate(COLLECTIONS.CAMPAIGNS, merged as any);
   } catch (err) {
     console.warn('Wix Data update failed (updating in memory):', err);
   }
@@ -103,7 +109,7 @@ export async function updateCampaign(id: string, updates: Partial<Campaign>): Pr
 
 export async function deleteCampaign(id: string): Promise<boolean> {
   try {
-    await items.remove(COLLECTIONS.CAMPAIGNS, id);
+    await elevatedRemove(COLLECTIONS.CAMPAIGNS, id);
   } catch (err) {
     // fallback
   }
@@ -113,7 +119,7 @@ export async function deleteCampaign(id: string): Promise<boolean> {
 // --- Offers CRUD ---
 export async function getOffersByCampaign(campaignId: string): Promise<Offer[]> {
   try {
-    const res = await items.query(COLLECTIONS.OFFERS).eq('campaignId', campaignId).find();
+    const res = await elevatedQuery(COLLECTIONS.OFFERS).eq('campaignId', campaignId).find();
     if (res.items && res.items.length > 0) {
       return res.items as unknown as Offer[];
     }
@@ -130,7 +136,7 @@ export async function saveOffer(offer: Offer): Promise<Offer> {
   };
 
   try {
-    await items.save(COLLECTIONS.OFFERS, item as any);
+    await elevatedSave(COLLECTIONS.OFFERS, item as any);
   } catch (err) {
     // fallback
   }
@@ -148,7 +154,7 @@ export async function recordOfferEvent(event: Omit<OfferEvent, '_id' | '_created
   };
 
   try {
-    await items.insert(COLLECTIONS.OFFER_EVENTS, item as any);
+    await elevatedInsert(COLLECTIONS.OFFER_EVENTS, item as any);
   } catch (err) {
     // fallback
   }
@@ -159,7 +165,7 @@ export async function recordOfferEvent(event: Omit<OfferEvent, '_id' | '_created
 
 export async function getOfferEvents(): Promise<OfferEvent[]> {
   try {
-    const res = await items.query(COLLECTIONS.OFFER_EVENTS).limit(500).find();
+    const res = await elevatedQuery(COLLECTIONS.OFFER_EVENTS).limit(500).find();
     if (res.items && res.items.length > 0) {
       return res.items as unknown as OfferEvent[];
     }
@@ -173,13 +179,10 @@ export async function getMonthlyAiUsage(): Promise<number> {
   const startOfMonth = getStartOfCurrentMonth();
 
   try {
-    const res = await items
-      .query(COLLECTIONS.OFFER_EVENTS)
+    return await elevatedQuery(COLLECTIONS.OFFER_EVENTS)
       .eq('eventType', 'recommendation_request')
       .ge('_createdDate', startOfMonth)
-      .limit(1000)
-      .find();
-    return res.items?.length || 0;
+      .count();
   } catch (err) {
     return memoryEvents.filter(
       (event) => event.eventType === 'recommendation_request' && (event._createdDate || '') >= startOfMonth,
@@ -190,7 +193,7 @@ export async function getMonthlyAiUsage(): Promise<number> {
 // --- App Settings ---
 export async function getAppSettings(): Promise<AppSettings> {
   try {
-    const res = await items.query(COLLECTIONS.APP_SETTINGS).limit(1).find();
+    const res = await elevatedQuery(COLLECTIONS.APP_SETTINGS).limit(1).find();
     if (res.items && res.items.length > 0) {
       const settings = res.items[0] as unknown as AppSettings;
       return { ...settings, monthlyAiUsage: await getMonthlyAiUsage() };
@@ -208,7 +211,7 @@ export async function updateAppSettings(updates: Partial<AppSettings>): Promise<
   };
 
   try {
-    await items.save(COLLECTIONS.APP_SETTINGS, memorySettings as any);
+    await elevatedSave(COLLECTIONS.APP_SETTINGS, memorySettings as any);
   } catch (err) {
     // fallback
   }

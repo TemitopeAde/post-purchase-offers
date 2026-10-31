@@ -1,5 +1,6 @@
 import type { Campaign, Offer, ProductCandidate } from '../types';
-import { getCampaigns, getOffersByCampaign, getAppSettings, recordOfferEvent } from '../wix/data';
+import { getCampaigns, getOffersByCampaign, getAppSettings, recordOfferEvent, getMonthlyAiUsage } from '../wix/data';
+import { getPlanContext } from '../wix/billing';
 import { getProductCandidates } from '../wix/catalog';
 import { getOrderContext, type OrderContext } from '../wix/orders';
 import { defaultDeepSeekProvider } from '../ai/providers/deepseek';
@@ -46,11 +47,15 @@ export function isCampaignEligible(campaign: Campaign, order: OrderContext): boo
 export async function generateOffersForOrder(
   orderId: string
 ): Promise<RecommendationResponse | null> {
-  const [order, campaigns, settings] = await Promise.all([
+  const [order, campaigns, settings, { limits }] = await Promise.all([
     getOrderContext(orderId),
     getCampaigns(),
     getAppSettings(),
+    getPlanContext(),
   ]);
+
+  // No paid plan or trial in progress: the app is inactive on this site.
+  if (!limits) return null;
 
   // If order cannot be validated from Wix, return null to avoid unauthorized offers
   if (!order) {
@@ -102,7 +107,10 @@ export async function generateOffersForOrder(
     defaultDeepSeekProvider.isConfigured() &&
     candidates.length > 0;
 
-  if (shouldTryAi && finalOffers.length < maxOffers) {
+  const withinAiAllowance =
+    shouldTryAi && (await getMonthlyAiUsage()) < limits.monthlyAiRecommendations;
+
+  if (withinAiAllowance && finalOffers.length < maxOffers) {
     try {
       await recordOfferEvent({
         campaignId: campaign._id || 'unknown',

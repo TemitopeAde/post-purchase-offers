@@ -1,5 +1,7 @@
 // Sample store data used to render the real app UI for App Market screenshots.
 
+import { PLANS } from '../../../src/lib/billing/plans';
+
 // Wide crops so photos fill the widget's 160px-tall image area.
 const img = (id: string) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=720&h=280&q=80`;
 
@@ -58,34 +60,28 @@ export const settings = {
   borderRadius: 8,
   enableAiExplanations: true,
   plan: 'Pro',
-  monthlyAiAllowance: 500,
   monthlyAiUsage: 212,
 };
 
 export const billing = {
   plan: 'Pro',
-  isFree: false,
+  limits: PLANS.Pro.limits,
   billingCycle: 'MONTHLY',
   expirationDate: '2026-12-01T00:00:00.000Z',
   autoRenewing: true,
-  monthlyUsage: 212,
-  monthlyAllowance: 500,
+  monthlyUsage: 1212,
+  activeCampaigns: 2,
   upgradeUrl: 'https://www.wix.com/apps/upgrade/app?appInstanceId=demo',
   fromWixBilling: true,
-  entitlements: { unlimitedCampaigns: true, advancedTargeting: true, smartRanking: true, analyticsExport: true },
 };
 
-// A store on the free plan, mid-trial and close to its request allowance (?billing=free).
-export const billingFree = {
+// A store mid-way through its Business free trial (?billing=trial).
+export const billingTrial = {
   ...billing,
-  plan: 'Free',
-  isFree: true,
-  billingCycle: undefined,
-  expirationDate: null,
-  autoRenewing: null,
-  freeTrial: { status: 'IN_PROGRESS', endDate: '2026-11-14T00:00:00.000Z' },
+  plan: 'Business',
+  limits: PLANS.Business.limits,
+  freeTrial: { status: 'IN_PROGRESS', endDate: '2026-11-03T00:00:00.000Z' },
   monthlyUsage: 431,
-  entitlements: { unlimitedCampaigns: false, advancedTargeting: false, smartRanking: true, analyticsExport: false },
 };
 
 export const recommendations = {

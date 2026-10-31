@@ -15,6 +15,7 @@ import {
 } from '@wix/design-system';
 import { Check, ExternalLink, LockLocked, Premium } from '@wix/wix-ui-icons-common/lazy';
 import type { BillingStatus } from '../../../../lib/types';
+import { PLANS, type PlanDefinition, type PlanId } from '../../../../lib/billing/plans';
 
 // Same workaround as my-page.tsx: WDS Box's typings clash with this project's React types.
 const Box = WdsBox as any;
@@ -29,11 +30,23 @@ const CYCLE_LABELS: Record<string, string> = {
   ONE_TIME: 'One-time purchase',
 };
 
-const FEATURES: { key: keyof BillingStatus['entitlements']; title: string; description: string }[] = [
-  { key: 'smartRanking', title: 'Smart product recommendations', description: 'Ranks your catalog against every completed order.' },
-  { key: 'unlimitedCampaigns', title: 'Unlimited campaigns', description: 'Run as many upsell and cross-sell campaigns as you need.' },
-  { key: 'advancedTargeting', title: 'Advanced targeting', description: 'Target offers by purchased products, collections and order value.' },
-  { key: 'analyticsExport', title: 'Analytics export', description: 'Download campaign performance for your own reporting.' },
+const PLAN_ORDER: PlanId[] = ['Pro', 'Business'];
+
+const PLAN_TAGLINES: Record<PlanId, string> = {
+  Pro: 'For growing stores running a few upsell campaigns.',
+  Business: 'For high-volume stores that test and report on every offer.',
+};
+
+// Each row renders a value per plan: a string, or a boolean shown as a check or a lock.
+const COMPARISON: { title: string; value: (plan: PlanDefinition) => string | boolean }[] = [
+  { title: 'Active campaigns', value: (p) => p.limits.maxActiveCampaigns?.toLocaleString() ?? 'Unlimited' },
+  { title: 'AI recommendations / month', value: (p) => p.limits.monthlyAiRecommendations.toLocaleString() },
+  { title: 'Smart product ranking', value: () => true },
+  { title: 'Targeting by product, collection and order value', value: (p) => p.limits.advancedTargeting },
+  { title: 'Stacked targeting rules (AND/OR)', value: (p) => p.limits.stackedRules },
+  { title: 'AI explanations on offers', value: (p) => p.limits.aiExplanations },
+  { title: 'Analytics history', value: (p) => (p.limits.analyticsDays ? `${p.limits.analyticsDays} days` : 'All history') },
+  { title: 'Support', value: (p) => (p.limits.prioritySupport ? 'Priority' : 'Email') },
 ];
 
 const USAGE_WARNING_PERCENT = 80;
@@ -41,19 +54,55 @@ const USAGE_WARNING_PERCENT = 80;
 const formatDate = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) : undefined;
 
+const formatPrice = (amount: number) => `$${amount % 1 === 0 ? amount : amount.toFixed(2)}`;
+
+const percentOf = (used: number, limit: number) => (limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0);
+
 function planBadge(billing: BillingStatus): ReactNode {
+  if (billing.isDevelopment) return <Badge skin="premium">Development</Badge>;
+  if (!billing.plan) return <Badge skin="danger">No plan</Badge>;
   if (billing.freeTrial?.status === 'IN_PROGRESS') return <Badge skin="premium">Free trial</Badge>;
-  if (billing.isFree) return <Badge skin="neutralLight">Free</Badge>;
   if (billing.autoRenewing === false) return <Badge skin="warning">Not renewing</Badge>;
   return <Badge skin="success">Active</Badge>;
 }
 
 function renewalText(billing: BillingStatus): string {
-  if (billing.isFree) return 'Upgrade to unlock unlimited campaigns, advanced targeting and analytics export.';
+  if (billing.isDevelopment) return 'All plan features are enabled for development testing.';
   const date = formatDate(billing.expirationDate);
   if (!date) return 'Your plan is active.';
   return billing.autoRenewing === false ? `Your plan ends on ${date}. Renewal is turned off.` : `Renews on ${date}.`;
 }
+
+const ComparisonValue: FC<{ value: string | boolean }> = ({ value }) =>
+  typeof value === 'string' ? (
+    <Text size="small">{value}</Text>
+  ) : (
+    <Text skin={value ? 'success' : 'disabled'}>{value ? <Check /> : <LockLocked />}</Text>
+  );
+
+const UsageMeter: FC<{ label: string; used: number; limit: number | null; unit: string }> = ({ label, used, limit, unit }) => {
+  if (limit === null) {
+    return (
+      <Box direction="vertical" gap="SP1">
+        <Text weight="bold">{label}</Text>
+        <Text size="small" secondary>{used.toLocaleString()} {unit} · Unlimited</Text>
+      </Box>
+    );
+  }
+  const percent = percentOf(used, limit);
+  return (
+    <Box direction="vertical" gap="SP2">
+      <Text weight="bold">{label}</Text>
+      <Text size="small" secondary>{used.toLocaleString()} of {limit.toLocaleString()} {unit}</Text>
+      <LinearProgressBar
+        value={percent}
+        showProgressIndication
+        skin={percent >= USAGE_WARNING_PERCENT ? 'warning' : 'standard'}
+        aria-label={`${label} used`}
+      />
+    </Box>
+  );
+};
 
 export const BillingTab: FC<{ billing: BillingStatus | null }> = ({ billing }) => {
   if (!billing || 'error' in billing) {
@@ -70,11 +119,9 @@ export const BillingTab: FC<{ billing: BillingStatus | null }> = ({ billing }) =
   }
 
   const openPricing = () => billing.upgradeUrl && window.open(billing.upgradeUrl, '_blank', 'noopener');
-  const usagePercent = billing.monthlyAllowance
-    ? Math.min(100, Math.round((billing.monthlyUsage / billing.monthlyAllowance) * 100))
-    : 0;
-  const nearLimit = usagePercent >= USAGE_WARNING_PERCENT;
+  const current = billing.plan ? PLANS[billing.plan] : billing.isDevelopment ? PLANS.Business : null;
   const trialEnds = billing.freeTrial?.status === 'IN_PROGRESS' ? formatDate(billing.freeTrial.endDate) : undefined;
+  const aiPercent = billing.limits ? percentOf(billing.monthlyUsage, billing.limits.monthlyAiRecommendations) : 0;
 
   return (
     <Box direction="vertical" gap="SP4">
@@ -84,97 +131,152 @@ export const BillingTab: FC<{ billing: BillingStatus | null }> = ({ billing }) =
         </SectionHelper>
       )}
 
+      {billing.isDevelopment && (
+        <SectionHelper skin="premium" title="Development mode">
+          Plan restrictions are bypassed for development testing. Production will enforce Wix plan limits.
+        </SectionHelper>
+      )}
+
+      {!current && (
+        <SectionHelper
+          skin="danger"
+          title="Your offers are turned off"
+          actionText={billing.upgradeUrl ? 'Choose a plan' : undefined}
+          onAction={billing.upgradeUrl ? openPricing : undefined}
+        >
+          Choose Pro or Business to show post-purchase offers to your customers. Both start with a{' '}
+          {PLANS.Pro.trialDays}-day free trial.
+        </SectionHelper>
+      )}
+
       {trialEnds && (
         <SectionHelper
           skin="premium"
           title={`Your free trial ends on ${trialEnds}`}
-          actionText={billing.upgradeUrl ? 'Choose a plan' : undefined}
+          actionText={billing.upgradeUrl ? 'Manage plan' : undefined}
           onAction={billing.upgradeUrl ? openPricing : undefined}
         >
-          Pick a plan before then to keep your offers running without interruption.
+          Your plan starts automatically when the trial ends, so your offers keep running.
         </SectionHelper>
       )}
 
-      <Layout>
-        <Cell span={7}>
-          <Card stretchVertically>
-            <Card.Header title="Your plan" subtitle="Billed through Wix" suffix={planBadge(billing)} />
-            <Card.Divider />
-            <Card.Content>
-              <Box direction="vertical" gap="SP4">
-                <Box direction="vertical" gap="SP1">
-                  <Heading size="large">{billing.plan}</Heading>
-                  {billing.billingCycle && CYCLE_LABELS[billing.billingCycle] && (
-                    <Text size="small" secondary>{CYCLE_LABELS[billing.billingCycle]}</Text>
-                  )}
-                </Box>
-                <Text>{renewalText(billing)}</Text>
-                <Box>
-                  {billing.isFree ? (
-                    <Button skin="premium" prefixIcon={<Premium />} disabled={!billing.upgradeUrl} onClick={openPricing}>
-                      Upgrade
-                    </Button>
-                  ) : (
+      {current && billing.limits && aiPercent >= USAGE_WARNING_PERCENT && (
+        <SectionHelper
+          skin="warning"
+          title={`You've used ${aiPercent}% of this month's AI recommendations`}
+          actionText={billing.plan === 'Pro' && billing.upgradeUrl ? 'Upgrade to Business' : undefined}
+          onAction={billing.plan === 'Pro' && billing.upgradeUrl ? openPricing : undefined}
+        >
+          When the allowance runs out, offers keep showing using smart product ranking until next month.
+        </SectionHelper>
+      )}
+
+      {current && billing.limits && (
+        <Layout>
+          <Cell span={7}>
+            <Card stretchVertically>
+          <Card.Header title="Your plan" subtitle={billing.isDevelopment ? 'Development override' : 'Billed through Wix'} suffix={planBadge(billing)} />
+              <Card.Divider />
+              <Card.Content>
+                <Box direction="vertical" gap="SP4">
+                  <Box direction="vertical" gap="SP1">
+                    <Heading size="large">{current.id}</Heading>
+                    {billing.billingCycle && CYCLE_LABELS[billing.billingCycle] && (
+                      <Text size="small" secondary>
+                        {CYCLE_LABELS[billing.billingCycle]} ·{' '}
+                        {formatPrice(billing.billingCycle === 'YEARLY' ? current.yearlyMonthlyPrice : current.monthlyPrice)}/month
+                      </Text>
+                    )}
+                  </Box>
+                  <Text>{renewalText(billing)}</Text>
+                  <Box>
                     <Button priority="secondary" suffixIcon={<ExternalLink />} disabled={!billing.upgradeUrl} onClick={openPricing}>
                       Manage plan
                     </Button>
-                  )}
-                </Box>
-              </Box>
-            </Card.Content>
-          </Card>
-        </Cell>
-
-        <Cell span={5}>
-          <Card stretchVertically>
-            <Card.Header title="Recommendation requests" subtitle="Used this month" />
-            <Card.Divider />
-            <Card.Content>
-              <Box direction="vertical" gap="SP3">
-                <Heading size="large">
-                  {billing.monthlyUsage.toLocaleString()} of {billing.monthlyAllowance.toLocaleString()}
-                </Heading>
-                <LinearProgressBar
-                  value={usagePercent}
-                  showProgressIndication
-                  skin={nearLimit ? 'warning' : 'standard'}
-                  aria-label="Monthly recommendation requests used"
-                />
-                {nearLimit && (
-                  <Text size="small" secondary>
-                    You've used {usagePercent}% of this month's requests.
-                  </Text>
-                )}
-              </Box>
-            </Card.Content>
-          </Card>
-        </Cell>
-      </Layout>
-
-      <Card>
-        <Card.Header title="What's included" subtitle={billing.isFree ? 'Features on your plan, and what upgrading unlocks' : 'Everything on your plan'} />
-        <Card.Divider />
-        <Card.Content>
-          <Box direction="vertical" gap="SP3">
-            {FEATURES.map((feature, index) => {
-              const included = billing.entitlements[feature.key];
-              return (
-                <Box key={feature.key} direction="vertical" gap="SP3">
-                  {index > 0 && <Divider />}
-                  <Box gap="SP3" verticalAlign="middle">
-                    <Text skin={included ? 'success' : 'disabled'}>{included ? <Check /> : <LockLocked />}</Text>
-                    <Box direction="vertical" flexGrow={1}>
-                      <Text weight="bold" skin={included ? 'standard' : 'disabled'}>{feature.title}</Text>
-                      <Text size="small" secondary>{feature.description}</Text>
-                    </Box>
-                    {!included && <Badge skin="premium" size="small">Premium</Badge>}
                   </Box>
                 </Box>
-              );
-            })}
-          </Box>
-        </Card.Content>
-      </Card>
+              </Card.Content>
+            </Card>
+          </Cell>
+
+          <Cell span={5}>
+            <Card stretchVertically>
+              <Card.Header title="Usage" subtitle="This month" />
+              <Card.Divider />
+              <Card.Content>
+                <Box direction="vertical" gap="SP4">
+                  <UsageMeter
+                    label="AI recommendations"
+                    used={billing.monthlyUsage}
+                    limit={billing.limits.monthlyAiRecommendations}
+                    unit="requests"
+                  />
+                  <UsageMeter
+                    label="Active campaigns"
+                    used={billing.activeCampaigns}
+                    limit={billing.limits.maxActiveCampaigns}
+                    unit="campaigns"
+                  />
+                </Box>
+              </Card.Content>
+            </Card>
+          </Cell>
+        </Layout>
+      )}
+
+      <Layout>
+        {PLAN_ORDER.map((id) => {
+          const plan = PLANS[id];
+          const isCurrent = billing.plan === id || (billing.isDevelopment && id === 'Business');
+          return (
+            <Cell key={id} span={6}>
+              <Card stretchVertically>
+                <Card.Header
+                  title={plan.id}
+                  subtitle={PLAN_TAGLINES[id]}
+                  suffix={isCurrent ? <Badge skin="success">Current plan</Badge> : undefined}
+                />
+                <Card.Divider />
+                <Card.Content>
+                  <Box direction="vertical" gap="SP4">
+                    <Box direction="vertical" gap="SP1">
+                      <Heading size="large">{formatPrice(plan.monthlyPrice)}/month</Heading>
+                      <Text size="small" secondary>
+                        or {formatPrice(plan.yearlyMonthlyPrice)}/month billed yearly · {plan.trialDays}-day free trial
+                      </Text>
+                    </Box>
+                    <Box direction="vertical" gap="SP3">
+                      {COMPARISON.map((row, index) => (
+                        <Box key={row.title} direction="vertical" gap="SP3">
+                          {index > 0 && <Divider />}
+                          <Box gap="SP3" verticalAlign="middle">
+                            <Box flexGrow={1}>
+                              <Text size="small" skin={row.value(plan) === false ? 'disabled' : 'standard'}>{row.title}</Text>
+                            </Box>
+                            <ComparisonValue value={row.value(plan)} />
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
+                    {!isCurrent && (
+                      <Box>
+                        <Button
+                          skin={id === 'Business' ? 'premium' : 'standard'}
+                          prefixIcon={id === 'Business' ? <Premium /> : undefined}
+                          disabled={!billing.upgradeUrl}
+                          onClick={openPricing}
+                        >
+                          {current ? `Switch to ${plan.id}` : `Start free trial`}
+                        </Button>
+                      </Box>
+                    )}
+                  </Box>
+                </Card.Content>
+              </Card>
+            </Cell>
+          );
+        })}
+      </Layout>
     </Box>
   );
 };

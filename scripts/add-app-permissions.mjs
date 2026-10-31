@@ -28,6 +28,8 @@ const PERMISSIONS = [
   'SCOPE.STORES.CATALOG_READ_LIMITED',
   // Get App Instance endpoint
   'SCOPE.DC.MANAGE-YOUR-APP',
+  // App lifecycle event subscriptions and app-instance/site metadata
+  'SCOPE.DEV_CENTER.APP-INSTANCE-READ-BASIC-INFO',
   // @wix/stores products.queryProducts / getProduct (Catalog V1)
   'SCOPE.DC-STORES.READ-PRODUCTS',
   // @wix/stores productsV3.getProduct (Catalog V3)

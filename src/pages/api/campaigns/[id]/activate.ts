@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { getCampaignById, updateCampaign } from '../../../../lib/wix/data';
+import { checkCampaignActivation } from '../../../../lib/wix/billing';
 
 export const POST: APIRoute = async ({ params }) => {
   const { id } = params;
@@ -11,6 +12,11 @@ export const POST: APIRoute = async ({ params }) => {
   // Validate campaign settings before activation
   if (!camp.name || camp.name.trim().length === 0) {
     return Response.json({ error: 'Campaign must have a valid name' }, { status: 400 });
+  }
+
+  if (camp.status !== 'active') {
+    const limitError = await checkCampaignActivation(id);
+    if (limitError) return Response.json({ error: limitError }, { status: 403 });
   }
 
   const updated = await updateCampaign(id, {

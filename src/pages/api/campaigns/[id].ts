@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { getCampaignById, updateCampaign, deleteCampaign } from '../../../lib/wix/data';
+import { checkCampaignActivation } from '../../../lib/wix/billing';
 
 export const GET: APIRoute = async ({ params }) => {
   const { id } = params;
@@ -17,6 +18,11 @@ export const PATCH: APIRoute = async ({ params, request }) => {
 
   try {
     const updates = await request.json();
+    if (updates.status === 'active') {
+      const limitError = await checkCampaignActivation(id);
+      if (limitError) return Response.json({ error: limitError }, { status: 403 });
+    }
+
     const updated = await updateCampaign(id, updates);
     if (!updated) return Response.json({ error: 'Campaign not found' }, { status: 404 });
 

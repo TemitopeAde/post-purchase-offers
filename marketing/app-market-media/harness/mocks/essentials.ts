@@ -5,7 +5,7 @@ const routes: Record<string, unknown> = {
   '/api/dashboard/overview': data.overview,
   '/api/campaigns': data.campaigns,
   '/api/settings': data.settings,
-  '/api/billing': new URLSearchParams(location.search).get('billing') === 'free' ? data.billingFree : data.billing,
+  '/api/billing': new URLSearchParams(location.search).get('billing') === 'trial' ? data.billingTrial : data.billing,
   '/api/recommendations': data.recommendations,
 };
 

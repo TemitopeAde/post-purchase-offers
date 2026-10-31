@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
-import { appInstances } from '@wix/app-management';
-import { getAppSettings, getMonthlyAiUsage } from '../../lib/wix/data';
+import { getCampaigns, getMonthlyAiUsage } from '../../lib/wix/data';
+import { getPlanContext } from '../../lib/wix/billing';
 import type { BillingStatus } from '../../lib/types';
 import wixConfig from '../../../wix.config.json';
 
@@ -10,23 +10,16 @@ const upgradeUrl = (instanceId: string) =>
 
 export const GET: APIRoute = async () => {
   try {
-    const [settings, monthlyUsage] = await Promise.all([getAppSettings(), getMonthlyAiUsage()]);
-
-    // Wix billing is the source of truth for the plan; fall back to stored settings if it can't be read.
-    let instance: appInstances.AppInstance | undefined;
-    try {
-      instance = (await appInstances.getAppInstance()).instance;
-    } catch (err) {
-      console.error('Get App Instance failed; using stored plan:', err);
-    }
-
+    const [{ plan, limits, instance, fromWixBilling, isDevelopment }, monthlyUsage, campaigns] = await Promise.all([
+      getPlanContext(),
+      getMonthlyAiUsage(),
+      getCampaigns(),
+    ]);
     const billing = instance?.billing;
-    const isFree = instance ? instance.isFree !== false : settings.plan === 'Free';
-    const paid = !isFree;
 
     const status: BillingStatus = {
-      plan: instance ? (paid ? billing?.packageName || 'Premium' : 'Free') : settings.plan,
-      isFree,
+      plan,
+      limits,
       billingCycle: billing?.billingCycle,
       expirationDate: billing?.expirationDate ?? null,
       autoRenewing: billing?.autoRenewing ?? null,
@@ -37,15 +30,10 @@ export const GET: APIRoute = async () => {
           }
         : undefined,
       monthlyUsage,
-      monthlyAllowance: settings.monthlyAiAllowance,
+      activeCampaigns: campaigns.filter((c) => c.status === 'active').length,
       upgradeUrl: instance?.instanceId ? upgradeUrl(instance.instanceId) : undefined,
-      fromWixBilling: Boolean(instance),
-      entitlements: {
-        unlimitedCampaigns: paid,
-        advancedTargeting: paid,
-        smartRanking: true,
-        analyticsExport: paid,
-      },
+      fromWixBilling,
+      isDevelopment,
     };
 
     return Response.json(status, { status: 200 });

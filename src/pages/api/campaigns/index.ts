@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { getCampaigns, createCampaign } from '../../../lib/wix/data';
 import type { Campaign } from '../../../lib/types';
 import { campaignFormSchema } from '../../../lib/validation/campaign';
+import { checkCampaignActivation } from '../../../lib/wix/billing';
 
 export const GET: APIRoute = async () => {
   try {
@@ -24,6 +25,11 @@ export const POST: APIRoute = async ({ request }) => {
 
     if (!parsed.success) {
       return Response.json({ error: parsed.error.issues[0]?.message || 'Invalid campaign data' }, { status: 400 });
+    }
+
+    if (body.status === 'active') {
+      const limitError = await checkCampaignActivation();
+      if (limitError) return Response.json({ error: limitError }, { status: 403 });
     }
 
     const created = await createCampaign({

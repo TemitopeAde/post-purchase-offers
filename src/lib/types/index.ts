@@ -1,3 +1,5 @@
+import type { PlanId, PlanLimits } from '../billing/plans';
+
 export type CampaignStatus = 'draft' | 'active' | 'paused' | 'archived';
 
 export type RecommendationMode =
@@ -96,32 +98,28 @@ export interface AppSettings {
   buttonTextColor: string;
   borderRadius: number;
   enableAiExplanations: boolean;
-  plan: 'Free' | 'Basic' | 'Pro';
-  monthlyAiAllowance: number;
+  /** Stored plan, used only when Wix billing can't be read. */
+  plan: PlanId;
   monthlyAiUsage: number;
 }
 
 export interface BillingStatus {
-  /** Plan name from Wix billing, or the stored plan when Wix billing is unavailable. */
-  plan: string;
-  isFree: boolean;
+  /** Null when the site has no paid plan and no free trial in progress. */
+  plan: PlanId | null;
+  limits: PlanLimits | null;
   billingCycle?: string;
   /** ISO date the current paid period ends. */
   expirationDate?: string | null;
   autoRenewing?: boolean | null;
   freeTrial?: { status: 'IN_PROGRESS' | 'ENDED' | 'NOT_AVAILABLE'; endDate?: string | null };
   monthlyUsage: number;
-  monthlyAllowance: number;
+  activeCampaigns: number;
   /** Wix pricing page for this site's app instance; open in a new tab. */
   upgradeUrl?: string;
   /** False when the Wix app instance couldn't be read and plan details came from app settings. */
   fromWixBilling: boolean;
-  entitlements: {
-    unlimitedCampaigns: boolean;
-    advancedTargeting: boolean;
-    smartRanking: boolean;
-    analyticsExport: boolean;
-  };
+  /** True when plan restrictions are bypassed for development testing. */
+  isDevelopment: boolean;
 }
 
 export interface ProductCandidate {
