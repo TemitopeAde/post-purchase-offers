@@ -1,7 +1,12 @@
 import { type FC, useState, useEffect, useCallback, type ChangeEvent } from 'react';
-import { widget, inputs } from '@wix/editor';
+import { widget, inputs, modals } from '@wix/editor';
+
+// App ID from wix.config.json. Dashboard modal URLs are relative to the
+// site's dashboard root (/dashboard/<siteId>/), so app pages live under app/<appId>/<routePath>.
+const APP_ID = '0b998a78-39e9-4acf-954c-572c762253d0';
 import {
   SidePanel,
+  Accordion,
   WixDesignSystemProvider,
   Input,
   FormField,
@@ -171,8 +176,22 @@ const Panel: FC = () => {
       <SidePanel width="320px" height="100vh">
         <SidePanel.Header title={t('postPurchaseSettings')} />
         <SidePanel.Content stretchVertically>
+          <SidePanel.Section title={t('appTitle')}>
+            <SidePanel.Field>
+              <Button
+                fullWidth
+                priority="secondary"
+                onClick={() => modals.openDashboardModal({ url: `app/${APP_ID}/offers` })}
+              >
+                {t('openDashboard')}
+              </Button>
+            </SidePanel.Field>
+          </SidePanel.Section>
+
           {/* HEADLINE SECTION */}
-          <SidePanel.Section title={t('mainHeading')}>
+          <Accordion multiple items={[
+            { title: t('mainHeading'), children: (
+          <>
             <SidePanel.Field>
               <FormField label={t('headingText')}>
                 <Input
@@ -198,10 +217,12 @@ const Panel: FC = () => {
               color={headingColor}
               onChange={(c) => handleColorUpdate('heading-color', c, setHeadingColor)}
             />
-          </SidePanel.Section>
+          </>
+            ) },
+            { title: t('subheading'), children: (
+          <>
 
           {/* SUBHEADING SECTION */}
-          <SidePanel.Section title={t('subheading')}>
             <SidePanel.Field>
               <FormField label={t('subheadingText')}>
                 <Input
@@ -227,10 +248,12 @@ const Panel: FC = () => {
               color={subheadingColor}
               onChange={(c) => handleColorUpdate('subheading-color', c, setSubheadingColor)}
             />
-          </SidePanel.Section>
+          </>
+            ) },
+            { title: t('productCards'), children: (
+          <>
 
           {/* PRODUCT CARDS SECTION */}
-          <SidePanel.Section title={t('productCards')}>
             <ColorPickerRow
               label={t('cardBackground')}
               color={cardBgColor}
@@ -282,10 +305,12 @@ const Panel: FC = () => {
               color={badgeTextColor}
               onChange={(c) => handleColorUpdate('badge-text-color', c, setBadgeTextColor)}
             />
-          </SidePanel.Section>
+          </>
+            ) },
+            { title: t('actionButton'), children: (
+          <>
 
           {/* CTA BUTTON SECTION */}
-          <SidePanel.Section title={t('actionButton')}>
             <SidePanel.Field>
               <FormField label={t('buttonLabel')}>
                 <Input
@@ -316,10 +341,12 @@ const Panel: FC = () => {
               color={buttonTextColor}
               onChange={(c) => handleColorUpdate('button-text-color', c, setButtonTextColor)}
             />
-          </SidePanel.Section>
+          </>
+            ) },
+            { title: t('containerLayout'), children: (
+          <>
 
           {/* CONTAINER & GEOMETRY SECTION */}
-          <SidePanel.Section title={t('containerLayout')}>
             <ColorPickerRow
               label={t('containerBackground')}
               color={containerBgColor}
@@ -338,7 +365,9 @@ const Panel: FC = () => {
                 />
               </FormField>
             </SidePanel.Field>
-          </SidePanel.Section>
+          </>
+            ) },
+          ]} />
         </SidePanel.Content>
       </SidePanel>
     </WixDesignSystemProvider>

@@ -164,6 +164,7 @@ const EN = {
   selectOption: 'Please select an option for this product.',
   unavailableCombination: 'That combination is unavailable. Please choose another option.',
   appTitle: 'Smart Post-Purchase Offers',
+  openDashboard: 'Configure Offers',
   loadSelectedProductsFailed: 'Could not load the products selected for this campaign',
   loadStoreProductsFailed: 'Could not load store products',
   updateCampaignFailed: 'Could not update the campaign',
